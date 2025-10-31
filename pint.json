@@ -1,0 +1,1 @@
+{"preset":"laravel","rules":{"not_operator_with_successor_space":false,"no_useless_else":true,"concat_space":{"spacing":"one"},"binary_operator_spaces":{"default":"single_space","operators":{"=>":"align_single_space_minimal"}}}}

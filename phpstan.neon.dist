@@ -1,0 +1,35 @@
+includes:
+    - phpstan-baseline.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+        - config
+        - database
+    tmpDir: build/phpstan
+    checkOctaneCompatibility: true
+    checkModelProperties: true
+
+    # Suppress specific findings that are expected for this package:
+    # - env() usage in config/lockout.php (common and acceptable for configs)
+    # - trait unused message for HasLockout (analyzed via tests / used by consumers)
+    # - property.notFound for LockoutLog properties (Eloquent dynamic properties)
+    # - function.alreadyNarrowedType for an is_array check that is defensive
+    # - booleanNot.alwaysTrue false positive in Lockout::attemptLockout under static analysis
+    ignoreErrors:
+        - message: "#Called 'env' outside of the config directory#"
+          paths:
+              - config/lockout.php
+        - message: "#Trait .* is used zero times and is not analysed#"
+          paths:
+              - src/Traits/HasLockout.php
+        - message: "#Access to an undefined property Beliven\\\\Lockout\\\\Models\\\\LockoutLog::\\$#"
+          paths:
+              - src/Lockout.php
+        - message: "#Call to function is_array\\(\\) with array will always evaluate to true#"
+          paths:
+              - src/Listeners/RecordFailedLoginAttempt.php
+        - message: "#Negated boolean expression is always true#"
+          paths:
+              - src/Lockout.php

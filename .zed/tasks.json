@@ -1,0 +1,1 @@
+[{"label":"laravel test $ZED_SYMBOL","command":"php test","args":["--filter $ZED_SYMBOL $(echo $ZED_RELATIVE_FILE)"],"tags":["phpunit-test","pest-test"]}]
