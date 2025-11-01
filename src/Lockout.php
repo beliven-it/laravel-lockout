@@ -142,6 +142,27 @@ class Lockout
         $logModel->ip_address = $data->ip ?? null;
         $logModel->user_agent = $data->user_agent ?? null;
         $logModel->attempted_at = now();
+
+        // Attempt to associate the log entry with the concrete Eloquent model
+        // (if a model exists for the given identifier). The migration provides a
+        // nullable morph column named `model` so we associate via that morph.
+        try {
+            $relatedModel = $this->getLoginModel($id);
+            if ($relatedModel) {
+                // Use morph association if available on the log model.
+                // The LockoutLog model exposes a morph relation `model()`.
+                if (method_exists($logModel, 'model')) {
+                    $logModel->model()->associate($relatedModel);
+                } else {
+                    // Fallback: set morph type/id directly if relation method is absent.
+                    $logModel->setAttribute('model_type', get_class($relatedModel));
+                    $logModel->setAttribute('model_id', $relatedModel->getKey());
+                }
+            }
+        } catch (\Throwable $e) {
+            // If association fails for any reason, ignore and still persist the log.
+        }
+
         $logModel->save();
     }
 }

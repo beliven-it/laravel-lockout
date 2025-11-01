@@ -3,6 +3,7 @@
 namespace Beliven\Lockout\Traits;
 
 use Beliven\Lockout\Facades\Lockout;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 trait HasLockout
 {
@@ -28,6 +29,16 @@ trait HasLockout
         }
 
         return Lockout::hasTooManyAttempts((string) $this->{$identifier});
+    }
+
+    /**
+     * Morph relation to the lockout logs associated with this model.
+     *
+     * Provides easy access to the LockoutLog entries for this entity.
+     */
+    public function lockoutLogs(): MorphMany
+    {
+        return $this->morphMany(\Beliven\Lockout\Models\LockoutLog::class, 'model');
     }
 
     /**

@@ -34,6 +34,7 @@ describe('Lockout flow', function () {
 
         Schema::create('lockout_logs', function (Blueprint $table) {
             $table->id();
+            $table->nullableMorphs('model');
             $table->string('identifier')->index();
             $table->string('ip_address')->nullable();
             $table->text('user_agent')->nullable();

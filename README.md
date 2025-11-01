@@ -125,6 +125,39 @@ You can replace listeners or the notification class via your app's event provide
 
 Every failed attempt is stored in `lockout_logs` with identifier, IP, user agent and timestamp — useful for auditing and investigations.
 
+Association to a model
+- Log entries can now be associated with the persistent model (for example your `User` model) when a model for the identifier exists. The `LockoutLog` model exposes a polymorphic `model()` relation so you can access the related model via `$log->model` (it will be `null` if no model is associated).
+
+Migration note
+- The package migration uses a nullable polymorphic relation for this association. The migration stub creates nullable morph columns (for example `nullableMorphs('model')`), so the table contains `model_type` and `model_id` as nullable columns.
+- If you have already published the migrations previously, update your `lockout_logs` table to include the nullable morph columns or re-publish the package migration. Example schema snippet used by the package:
+```php
+$table->nullableMorphs('model');
+$table->string('identifier')->nullable();
+$table->string('ip_address')->nullable();
+$table->text('user_agent')->nullable();
+$table->timestamp('attempted_at');
+```
+
+Usage example
+```php
+use Beliven\Lockout\Models\LockoutLog;
+use App\Models\User; // Replace with your actual auth model namespace
+
+// Accessing via the LockoutLog model
+$log = LockoutLog::first();
+$relatedModel = $log->model; // Returns the associated model (e.g. User) or null
+
+// Or via the model's convenience relation provided by the HasLockout trait
+// (any model using the trait exposes the `lockoutLogs()` morphMany relation)
+$user = User::where('email', 'test@example.com')->first();
+$recentAttempts = $user->lockoutLogs()->latest('attempted_at')->take(10)->get();
+$attemptsCount = $user->lockoutLogs()->count();
+```
+
+Compatibility
+- This change is backward compatible: logs are still recorded with identifier and metadata even when no model exists or when association fails. The association step is attempted but non-fatal so logging will never prevent the lockout flow.
+
 ---
 
 ## Testing

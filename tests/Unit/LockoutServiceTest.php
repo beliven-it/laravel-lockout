@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 describe('Lockout service', function () {
     beforeEach(function () {
-        // Use array cache to avoid external dependencies and have deterministic state
+        // Use in-memory array cache to avoid external dependencies and have deterministic state
         config()->set('lockout.cache_store', 'array');
         Cache::store('array')->flush();
 
@@ -22,6 +22,7 @@ describe('Lockout service', function () {
         Schema::dropIfExists('lockout_logs');
         Schema::create('lockout_logs', function (Blueprint $table) {
             $table->id();
+            $table->nullableMorphs('model');
             $table->string('identifier')->index();
             $table->string('ip_address')->nullable();
             $table->text('user_agent')->nullable();
@@ -130,6 +131,50 @@ describe('Lockout service', function () {
             // And there should be no additional side-effect beyond what attemptLockout intentionally does.
             // At least ensure attempts count remains >= threshold.
             expect($service->getAttempts($identifier))->toBeGreaterThanOrEqual(2);
+        });
+
+        it('associates created log with the model when a model exists for the identifier', function () {
+            // Ensure the test uses a known threshold and the Lockout service instance
+            config()->set('lockout.max_attempts', 3);
+            $service = app(Lockout::class);
+
+            // Ensure the users table exists and a test user is created that matches the identifier
+            Schema::dropIfExists('users');
+            Schema::create('users', function (Blueprint $table) {
+                $table->id();
+                $table->string('email')->unique();
+                $table->string('password')->nullable();
+                $table->timestamp('blocked_at')->nullable();
+                $table->timestamps();
+            });
+
+            // Make sure Lockout resolves the test User fixture model
+            config()->set('auth.providers.users.model', \Beliven\Lockout\Tests\Fixtures\User::class);
+
+            // Create the user that will be associated with the log
+            \Beliven\Lockout\Tests\Fixtures\User::query()->create([
+                'email'    => 'logmodel@example.test',
+                'password' => 'secret',
+            ]);
+
+            $identifier = 'logmodel@example.test';
+            $meta = (object) ['ip' => '127.0.0.1', 'user_agent' => 'phpunit'];
+
+            // Perform a lockout attempt which creates a log entry (and will attempt association)
+            $service->attemptLockout($identifier, $meta);
+
+            // Fetch the most recent log for the identifier
+            $log = DB::table('lockout_logs')->where('identifier', $identifier)->orderByDesc('id')->first();
+
+            expect($log)->not->toBeNull();
+
+            // The morph columns should have been populated to reference the User model
+            expect($log->model_type)->toBe(\Beliven\Lockout\Tests\Fixtures\User::class);
+            $expectedModelId = \Beliven\Lockout\Tests\Fixtures\User::query()->where('email', $identifier)->value('id');
+            expect($log->model_id)->toBe($expectedModelId);
+
+            // Clean up the users table
+            Schema::dropIfExists('users');
         });
     });
 });

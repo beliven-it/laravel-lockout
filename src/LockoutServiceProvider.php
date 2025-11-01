@@ -25,7 +25,7 @@ class LockoutServiceProvider extends PackageServiceProvider
             ->name('laravel-lockout')
             ->hasConfigFile()
             ->hasRoute('web')
-            ->hasMigration('create_laravel_lockout_logs_table')
+            ->hasMigration('create_lockout_logs_table')
             ->hasCommand(LockoutCommand::class);
     }
 
