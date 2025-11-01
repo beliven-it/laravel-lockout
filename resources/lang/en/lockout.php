@@ -21,7 +21,7 @@ return [
             'subject' => 'Account Locked Due to Multiple Failed Login Attempts',
             'line1'   => 'Your account with identifier :identifier has been locked due to multiple failed login attempts.',
             'line2'   => 'The lockout will last for :minutes minutes.',
-            'action'  => 'Reset Your Password',
+            'action'  => 'Unlock account',
             'footer'  => 'If you did not attempt to log in, please contact support immediately.',
         ],
     ],
