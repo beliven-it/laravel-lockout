@@ -12,6 +12,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Automatic unlock (expiry)
+    |--------------------------------------------------------------------------
+    |
+    | Control automatic expiry of persistent model locks (the `expires_at` column).
+    |
+    | - 'auto_unlock_hours' (int): number of hours after which a created
+    |   persistent lock will expire automatically. When creating a lock, if this
+    |   value is > 0 the lock's `expires_at` will be set to now()->addHours(...).
+    |   If set to 0 (the default), automatic expiry is disabled and `expires_at`
+    |   will be stored as null (manual unlock only).
+    |
+    | Example:
+    |   'auto_unlock_hours' => 24, // locks expire after 24 hours
+    */
+    'auto_unlock_hours' => (int) env('LOCKOUT_AUTO_UNLOCK_HOURS', 0),
+
+    /*
+    |--------------------------------------------------------------------------
     | Pruning / Retention
     |--------------------------------------------------------------------------
     |

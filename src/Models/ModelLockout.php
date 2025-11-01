@@ -111,6 +111,29 @@ class ModelLockout extends Model
     }
 
     /**
+     * Scope that returns records safe to prune relative to a cutoff timestamp.
+     *
+     * Selects records that either:
+     *  - have been explicitly unlocked (unlocked_at not null) and unlocked_at < $cutoff, OR
+     *  - have an expiry timestamp (expires_at not null) and expires_at < $cutoff (i.e. long-expired).
+     *
+     * This scope centralizes the pruning criteria so pruning commands and jobs
+     * can reuse the exact same logic and remain consistent.
+     */
+    public function scopePrunable(Builder $query, Carbon $cutoff): Builder
+    {
+        return $query->where(function (Builder $q) use ($cutoff) {
+            $q->where(function (Builder $q2) use ($cutoff) {
+                $q2->whereNotNull('unlocked_at')
+                    ->where('unlocked_at', '<', $cutoff);
+            })->orWhere(function (Builder $q3) use ($cutoff) {
+                $q3->whereNotNull('expires_at')
+                    ->where('expires_at', '<', $cutoff);
+            });
+        });
+    }
+
+    /**
      * Create a new active lock record convenience helper.
      *
      * This is useful when using the relation (e.g. $model->lockouts()->create(...))

@@ -117,9 +117,9 @@ class PruneLockouts extends Command
     {
         $cutoff = Carbon::now()->subDays($days);
 
-        // Delete only records that have been unlocked and are older than cutoff.
-        return ModelLockout::whereNotNull('unlocked_at')
-            ->where('unlocked_at', '<', $cutoff)
-            ->delete();
+        // Use the ModelLockout::prunable scope to centralize pruning logic.
+        // The scope selects records that are safe to delete: either explicitly
+        // unlocked and older than cutoff, or expired and older than cutoff.
+        return ModelLockout::prunable($cutoff)->delete();
     }
 }

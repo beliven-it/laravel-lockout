@@ -69,9 +69,19 @@ class MarkModelAsLocked
                     }
 
                     if (!$hasActive) {
-                        $model->lockouts()->create([
+                        // Determine expiry based on configuration. If auto_unlock_hours is 0,
+                        // we store a null expires_at (manual unlock). Otherwise compute expiry.
+                        $autoHours = (int) config('lockout.auto_unlock_hours', 0);
+                        $attributes = [
                             'locked_at' => now(),
-                        ]);
+                        ];
+                        if ($autoHours > 0) {
+                            $attributes['expires_at'] = now()->addHours($autoHours);
+                        } else {
+                            $attributes['expires_at'] = null;
+                        }
+
+                        $model->lockouts()->create($attributes);
                     }
                 } catch (Throwable $_) {
                     // Relation-based creation failed; swallow to keep flow resilient.
