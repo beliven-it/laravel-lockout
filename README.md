@@ -201,6 +201,75 @@ vendor/bin/pest tests/Unit/SomeTest.php
 
 Example listener registration is done via your `EventServiceProvider` if you need to override defaults.
 
+### Example: Laravel Nova Action
+
+If you use Laravel Nova, you can expose an Action that lets administrators unlock a user directly from the Nova resource. The Action can resolve the model and call the trait helper `$model->unlock(...)`, which delegates to the package service.
+
+Example Nova Action (concise):
+
+```php
+<?php
+
+namespace App\Nova\Actions;
+
+use Laravel\Nova\Actions\Action;
+use Laravel\Nova\Fields\ActionFields;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+
+class UnlockUser extends Action implements ShouldQueue
+{
+    use Queueable;
+
+    public function name()
+    {
+        return 'Unlock account';
+    }
+
+    /**
+     * Handle the action for the given models.
+     *
+     * @param  \Laravel\Nova\Fields\ActionFields  $fields
+     * @param  \Illuminate\Support\Collection  $models
+     */
+    public function handle(ActionFields $fields, $models)
+    {
+        foreach ($models as $model) {
+            // call the HasLockout trait helper which delegates to the Lockout service
+            // you can pass optional metadata like reason/actor/requestData
+            $model->unlock([
+                'reason' => 'Unlocked by admin via Nova',
+                'actor'  => auth()->user()?->id ?? null,
+            ]);
+        }
+
+        return Action::message('Selected accounts have been unlocked.');
+    }
+
+    public function fields()
+    {
+        return [];
+    }
+}
+```
+
+Add the action to your Nova Resource (e.g. `User` resource):
+
+```php
+// in app/Nova/User.php
+
+public function actions(Request $request)
+{
+    return [
+        new \App\Nova\Actions\UnlockUser,
+    ];
+}
+```
+
+Notes:
+- The Nova Action calls the model method `unlock()` directly; the trait delegates to the package service so the unlock behaviour (clearing attempts, dispatching events) remains consistent.
+- If you need to customize the service used by the trait, you can override `resolveLockoutService()` on your model (see Customization & Extensibility).
+
 ---
 
 ## Contributing
