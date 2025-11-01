@@ -113,9 +113,15 @@ trait HasLockout
      * Unlock the model by marking the active lock as unlocked.
      *
      * If no active lock exists this is a no-op.
+     *
+     * Accepts optional parameters and forwards them to the Lockout service:
+     *  - 'reason' => string|null
+     *  - 'meta'   => array|null
+     *  - 'actor'  => mixed|null
+     *  - 'requestData' => object|null
      */
     public function unlock(array $options = []): ?ModelLockout
     {
-        return Lockout::unlockModel($this);
+        return Lockout::unlockModel($this, $options);
     }
 }

@@ -131,7 +131,7 @@ class Lockout
         return $modelClass::where($this->getLoginField(), $identifier)->first();
     }
 
-    public function lockModel(Model $model): ?ModelLockout
+    public function lockModel(Model $model, array $options = []): ?ModelLockout
     {
         $attributes = [
             'locked_at'  => $options['locked_at'] ?? now(),
@@ -140,23 +140,71 @@ class Lockout
             'meta'       => $options['meta'] ?? null,
         ];
 
-        return $model->lockouts()->create($attributes);
+        try {
+            return $model->lockouts()->create($attributes);
+        } catch (\Throwable $_) {
+            // Keep the service resilient in environments where relation creation
+            // could fail (tests or constrained DB). Return null to indicate failure.
+            return null;
+        }
     }
 
-    public function unlockModel(Model $model): ?ModelLockout
+    public function unlockModel(Model $model, array $options = []): ?ModelLockout
     {
         $lock = $model->activeLock();
         if (!$lock) {
             return null;
         }
 
-        $lock->markUnlocked();
+        // Apply optional reason/meta/actor before unlocking
+        if (array_key_exists('reason', $options) && $options['reason'] !== null) {
+            $lock->reason = $options['reason'];
+        }
 
+        if (array_key_exists('meta', $options) && $options['meta'] !== null) {
+            $existing = (array) ($lock->meta ?? []);
+            $lock->meta = array_merge($existing, (array) $options['meta']);
+        }
+
+        if (array_key_exists('actor', $options) && $options['actor'] !== null) {
+            $existing = (array) ($lock->meta ?? []);
+            $existing['actor'] = $options['actor'];
+            $lock->meta = $existing;
+        }
+
+        // Mark unlocked and persist
+        $lock->unlocked_at = now();
+
+        try {
+            $saved = $lock->save();
+        } catch (\Throwable $e) {
+            // Failed to save the lock record; return null to indicate failure.
+            return null;
+        }
+
+        // Clear attempt counters for the concrete identifier value (e.g. user's email)
         $loginField = $this->getLoginField();
         $identifierValue = $model->$loginField ?? null;
-        $this->clearAttempts($identifierValue);
+        if ($identifierValue) {
+            try {
+                $this->clearAttempts((string) $identifierValue);
+            } catch (\Throwable $_) {
+                // ignore clearing attempts failures
+            }
+        }
 
-        return $lock;
+        // Dispatch EntityUnlocked event so listeners can handle notifications/audit
+        try {
+            $requestData = isset($options['requestData']) && is_object($options['requestData'])
+                ? $options['requestData']
+                : (object) $options;
+
+            event(new \Beliven\Lockout\Events\EntityUnlocked($model, $lock, (string) ($identifierValue ?? ''), $requestData));
+        } catch (\Throwable $_) {
+            // ignore event dispatch failures
+        }
+
+        return $saved ? $lock : null;
     }
 
     /**

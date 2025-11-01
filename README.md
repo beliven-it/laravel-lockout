@@ -200,6 +200,83 @@ $recentAttempts = $user->lockoutLogs()->latest('attempted_at')->take(10)->get();
 $attemptsCount = $user->lockoutLogs()->count();
 ```
 
+### Example: Laravel Nova Action
+
+If you use Laravel Nova and want an admin Action to unlock selected users, you can call the model helper `unlock()` (which delegates to the Lockout service). The example below shows a simple Nova Action that unlocks each selected resource and records an optional reason/meta.
+
+```php
+<?php
+
+namespace App\Nova\Actions;
+
+use Laravel\Nova\Actions\Action;
+use Laravel\Nova\Fields\ActionFields;
+use Illuminate\Support\Collection;
+
+class UnlockUsers extends Action
+{
+    /**
+     * The displayable name of the action.
+     *
+     * @var string
+     */
+    public $name = 'Unlock Users';
+
+    /**
+     * Perform the action on the given models.
+     *
+     * @param  \Laravel\Nova\Fields\ActionFields  $fields
+     * @param  \Illuminate\Support\Collection  $models
+     * @return mixed
+     */
+    public function handle(ActionFields $fields, Collection $models)
+    {
+        foreach ($models as $model) {
+            // Call the trait-provided helper. You can pass optional metadata or a reason.
+            // The trait delegates to the Lockout service so behavior is consistent with
+            // other codepaths (listeners/commands/controllers).
+            $model->unlock([
+                'reason' => 'Manual admin unlock',
+                'meta' => ['via' => 'nova'],
+            ]);
+        }
+
+        return Action::message('Selected users have been unlocked.');
+    }
+
+    /**
+     * Fields shown on the action UI (none in this simple example).
+     *
+     * @return array
+     */
+    public function fields()
+    {
+        return [];
+    }
+}
+```
+
+Register the action on your Nova resource (for example `App\Nova\User`):
+
+```php
+<?php
+// in App\Nova\User.php
+
+use App\Nova\Actions\UnlockUsers;
+
+public function actions(Request $request)
+{
+    return [
+        new UnlockUsers,
+    ];
+}
+```
+
+Notes
+- Ensure your Eloquent auth model uses `Beliven\Lockout\Traits\HasLockout`.
+- `unlock()` returns the updated `ModelLockout` instance (or `null` if no active lock existed) — adapt your Action behavior if you need to inspect the result.
+- For auditing, you can pass a `reason` and `meta` array; listeners for the `EntityUnlocked` event can react to the unlock and perform notifications or extra logging.
+
 ---
 
 ## Testing
