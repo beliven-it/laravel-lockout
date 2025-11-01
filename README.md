@@ -272,15 +272,23 @@ Notes:
 
 ---
 
+## Changelog
+
+Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
+
 ## Contributing
 
-Thanks for considering contributions! Please:
-- Open issues for bugs/ideas.
-- Send PRs with tests and clear motivation.
-- Follow coding standards (pint) and run tests before submitting.
+Please see [CONTRIBUTING](https://github.com/beliven-it/.github/blob/main/CONTRIBUTING.md) for details.
 
----
+## Security Vulnerabilities
+
+Please review [our security policy](https://github.com/beliven-it/.github/blob/main/SECURITY.md) on how to report security vulnerabilities.
+
+## Credits
+
+- [Fabrizio Gortani](https://github.com/beliven-it)
+- [All Contributors](../../contributors)
 
 ## License
 
-MIT — see `LICENSE.md` for details.
+The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
