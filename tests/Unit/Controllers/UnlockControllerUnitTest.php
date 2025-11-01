@@ -17,7 +17,7 @@ describe('UnlockController (unit)', function () {
         // Create a simple Eloquent model that exposes unlock()
         $model = new class extends \Illuminate\Database\Eloquent\Model
         {
-            public $blocked_at;
+            public $locked_at;
 
             public $unlocked = false;
 
@@ -56,13 +56,14 @@ describe('UnlockController (unit)', function () {
         expect($model->unlocked)->toBeTrue();
     });
 
-    it('falls back to clearing blocked_at and saving the model when no unlock method exists', function () {
+    it('does not clear legacy locked_at on the model when unlocking (no legacy behavior)', function () {
         $identifier = 'unit-fallback@example.test';
 
-        // Model without unlock/unlockAccount methods; controller should clear blocked_at and call save()
+        // Model without an unlock() method and without lockouts()/activeLock();
+        // controller should not attempt legacy locked_at clearing.
         $model = new class extends \Illuminate\Database\Eloquent\Model
         {
-            public $blocked_at;
+            public $locked_at;
 
             public $saved = false;
 
@@ -77,8 +78,8 @@ describe('UnlockController (unit)', function () {
             }
         };
 
-        // Set a blocked_at initially to ensure controller clears it
-        $model->blocked_at = now();
+        // Set a locked_at initially to ensure legacy behavior would have cleared it.
+        $model->locked_at = now();
 
         Lockout::shouldReceive('getLoginModel')->once()->with($identifier)->andReturn($model);
 
@@ -90,9 +91,9 @@ describe('UnlockController (unit)', function () {
 
         expect($response->getStatusCode())->toBe(302);
 
-        // The controller should have cleared blocked_at and persisted via save()
-        expect($model->blocked_at)->toBeNull();
-        expect($model->saved)->toBeTrue();
+        // New behavior: controller relies on model_lockouts and does not touch legacy locked_at.
+        expect($model->locked_at)->not->toBeNull();
+        expect($model->saved)->toBeFalse();
     });
 
     it('redirects to login with error when model is not found', function () {

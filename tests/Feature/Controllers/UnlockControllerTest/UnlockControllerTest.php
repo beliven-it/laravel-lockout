@@ -8,6 +8,7 @@ use Beliven\Lockout\Tests\Fixtures\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -24,6 +25,7 @@ describe('UnlockController and EnsureUserIsNotLocked middleware', function () {
         config()->set('auth.providers.users.model', \Beliven\Lockout\Tests\Fixtures\User::class);
 
         // Create tables used by the package
+        Schema::dropIfExists('model_lockouts');
         Schema::dropIfExists('lockout_logs');
         Schema::dropIfExists('users');
 
@@ -31,12 +33,26 @@ describe('UnlockController and EnsureUserIsNotLocked middleware', function () {
             $table->id();
             $table->string('email')->unique();
             $table->string('password')->nullable();
-            $table->timestamp('blocked_at')->nullable();
             $table->timestamps();
+        });
+
+        Schema::create('model_lockouts', function (Blueprint $table) {
+            $table->id();
+            $table->string('model_type');
+            $table->unsignedBigInteger('model_id');
+            $table->timestamp('locked_at')->nullable();
+            $table->timestamp('unlocked_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
+            $table->string('reason')->nullable();
+            $table->json('meta')->nullable();
+            $table->timestamps();
+
+            $table->index(['model_type', 'model_id']);
         });
 
         Schema::create('lockout_logs', function (Blueprint $table) {
             $table->id();
+            $table->nullableMorphs('model');
             $table->string('identifier')->index();
             $table->string('ip_address')->nullable();
             $table->text('user_agent')->nullable();
@@ -72,12 +88,20 @@ describe('UnlockController and EnsureUserIsNotLocked middleware', function () {
         // but keeping this here avoids surprises in some environments.)
     });
 
-    it('UnlockController clears blocked_at and redirects to login', function () {
+    it('UnlockController clears active model lock and redirects to login', function () {
         // Seed a locked user
         $user = User::query()->create([
-            'email'      => 'locked@example.test',
-            'password'   => Hash::make('secret'),
-            'blocked_at' => now(),
+            'email'    => 'locked@example.test',
+            'password' => Hash::make('secret'),
+        ]);
+
+        // Create an active lock record referencing the created user
+        DB::table('model_lockouts')->insert([
+            'model_type' => \Beliven\Lockout\Tests\Fixtures\User::class,
+            'model_id'   => $user->id,
+            'locked_at'  => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         $request = Request::create('/lockout/unlock', 'GET', [
@@ -94,17 +118,30 @@ describe('UnlockController and EnsureUserIsNotLocked middleware', function () {
         expect(method_exists($response, 'getStatusCode'))->toBeTrue();
         expect($response->getStatusCode())->toBe(302);
 
-        // Ensure the user's blocked_at has been cleared
+        // Ensure the user's active lock has been cleared
         $user->refresh();
-        expect($user->blocked_at)->toBeNull();
+        $active = DB::table('model_lockouts')
+            ->where('model_type', \Beliven\Lockout\Tests\Fixtures\User::class)
+            ->where('model_id', $user->id)
+            ->whereNull('unlocked_at')
+            ->first();
+        expect($active)->toBeNull();
     });
 
     it('signed unlock route unblocks user and redirects to login', function () {
         // Seed a locked user
         $user = User::query()->create([
-            'email'      => 'signed-locked@example.test',
-            'password'   => Hash::make('secret'),
-            'blocked_at' => now(),
+            'email'    => 'signed-locked@example.test',
+            'password' => Hash::make('secret'),
+        ]);
+
+        // Create active lock record
+        DB::table('model_lockouts')->insert([
+            'model_type' => \Beliven\Lockout\Tests\Fixtures\User::class,
+            'model_id'   => $user->id,
+            'locked_at'  => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         // Generate a temporary signed URL for the named route
@@ -119,17 +156,30 @@ describe('UnlockController and EnsureUserIsNotLocked middleware', function () {
         $response->assertStatus(302);
         $response->assertRedirect(route('login'));
 
-        // Ensure the user's blocked_at has been cleared
+        // Ensure the user's active lock has been cleared
         $user->refresh();
-        expect($user->blocked_at)->toBeNull();
+        $active = DB::table('model_lockouts')
+            ->where('model_type', \Beliven\Lockout\Tests\Fixtures\User::class)
+            ->where('model_id', $user->id)
+            ->whereNull('unlocked_at')
+            ->first();
+        expect($active)->toBeNull();
     });
 
     it('rejects unlock request with invalid signature', function () {
         // Seed a locked user
         $user = User::query()->create([
-            'email'      => 'tampered-locked@example.test',
-            'password'   => Hash::make('secret'),
-            'blocked_at' => now(),
+            'email'    => 'tampered-locked@example.test',
+            'password' => Hash::make('secret'),
+        ]);
+
+        // Create active lock record
+        DB::table('model_lockouts')->insert([
+            'model_type' => \Beliven\Lockout\Tests\Fixtures\User::class,
+            'model_id'   => $user->id,
+            'locked_at'  => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         // Generate a valid signed URL then tamper it to invalidate the signature
@@ -145,19 +195,32 @@ describe('UnlockController and EnsureUserIsNotLocked middleware', function () {
         // Invalid signature should result in 403 Forbidden from the signed middleware
         $response->assertStatus(403);
 
-        // Ensure the user's blocked_at is still present (controller was not invoked)
+        // Ensure the user's active lock is still present (controller was not invoked)
         $user->refresh();
-        expect($user->blocked_at)->not->toBeNull();
+        $active = DB::table('model_lockouts')
+            ->where('model_type', \Beliven\Lockout\Tests\Fixtures\User::class)
+            ->where('model_id', $user->id)
+            ->whereNull('unlocked_at')
+            ->first();
+        expect($active)->not->toBeNull();
     });
 
     describe('EnsureUserIsNotLocked middleware', function () {
-        it('blocks requests when model has blocked_at set', function () {
+        it('blocks requests when model has an active lock record', function () {
             $email = 'blocked-model@example.test';
             // create blocked user
-            User::query()->create([
-                'email'      => $email,
-                'password'   => Hash::make('secret'),
-                'blocked_at' => now(),
+            $user = User::query()->create([
+                'email'    => $email,
+                'password' => Hash::make('secret'),
+            ]);
+
+            // create active lock record
+            DB::table('model_lockouts')->insert([
+                'model_type' => \Beliven\Lockout\Tests\Fixtures\User::class,
+                'model_id'   => $user->id,
+                'locked_at'  => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             $request = Request::create('/login', 'POST', [
@@ -178,11 +241,10 @@ describe('UnlockController and EnsureUserIsNotLocked middleware', function () {
 
         it('blocks requests when attempts in cache exceed threshold even if model is not marked', function () {
             $email = 'blocked-cache@example.test';
-            // create user without blocked_at
+            // create user without any persistent lock
             User::query()->create([
-                'email'      => $email,
-                'password'   => Hash::make('secret'),
-                'blocked_at' => null,
+                'email'    => $email,
+                'password' => Hash::make('secret'),
             ]);
 
             /** @var LockoutService $service */
@@ -214,9 +276,8 @@ describe('UnlockController and EnsureUserIsNotLocked middleware', function () {
         it('allows requests when identifier is not locked', function () {
             $email = 'clean@example.test';
             User::query()->create([
-                'email'      => $email,
-                'password'   => Hash::make('secret'),
-                'blocked_at' => null,
+                'email'    => $email,
+                'password' => Hash::make('secret'),
             ]);
 
             $request = Request::create('/login', 'POST', [

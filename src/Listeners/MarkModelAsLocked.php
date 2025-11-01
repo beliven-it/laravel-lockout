@@ -10,53 +10,45 @@ class MarkModelAsLocked
 {
     /**
      * Handle the event.
-     *
-     * When an EntityLocked event is dispatched it means the identifier reached
-     * the configured attempt threshold. This listener will mark the corresponding
-     * model's `blocked_at` timestamp (using the model's `lock()` method if
-     * available, otherwise updating the column directly).
      */
     public function handle(EntityLocked $event): void
     {
+        // Single outer-level safeguard so we never bubble exceptions
+        // from lockout handling into the host application.
         try {
-            // The EntityLocked event exposes the identifier property.
             $identifier = $event->identifier;
 
-            // Resolve the Lockout service from the container to access instance methods.
+            // Resolve the Lockout service and model for the identifier.
             $lockout = app(LockoutService::class);
-
-            // Try to resolve the model using the Lockout service convenience method.
             $model = $lockout->getLoginModel($identifier);
 
             if (!$model) {
-                // Nothing to mark (no persistent model found for the identifier).
                 return;
             }
 
-            // If the model exposes a `lock()` method (for example via the HasLockout trait),
-            // prefer calling it so the model can encapsulate its own locking logic.
-            // Use method_exists at runtime; silence phpstan about the model type here.
-            // @phpstan-ignore-next-line
+            // Prefer model-provided lock logic when available.
             if (method_exists($model, 'lock')) {
-                $model->lock();
+                try {
+                    $model->lock();
+                } catch (Throwable $_) {
+                    // If model->lock() throws, swallow and avoid breaking the app.
+                }
 
                 return;
             }
 
-            // Otherwise, set the `blocked_at` timestamp and persist.
-            // If the model class declares a public `blocked_at` property, set it directly
-            // to keep the intent clear; otherwise fall back to setAttribute to avoid
-            // property-access warnings from static analyzers and support Eloquent attribute handling.
-            if (property_exists($model, 'blocked_at')) {
-                $model->blocked_at = now();
-            } else {
-                $model->setAttribute('blocked_at', now());
+            // Otherwise, attempt to create a lock record via the model's relation.
+            if (method_exists($model, 'lockouts')) {
+                try {
+                    $model->lockouts()->create([
+                        'locked_at' => now(),
+                    ]);
+                } catch (Throwable $_) {
+                    // Relation-based creation failed; swallow to keep flow resilient.
+                }
             }
-            $model->save();
-        } catch (Throwable $e) {
-            // Never let exceptions break the flow of the application.
-            // Swallowing here keeps the lockout flow resilient. Host apps may
-            // choose to log this if they want visibility into failures.
+        } catch (Throwable $_) {
+            // Never allow exceptions to bubble out of this listener.
         }
     }
 }

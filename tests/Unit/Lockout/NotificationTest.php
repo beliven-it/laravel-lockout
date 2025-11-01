@@ -21,7 +21,7 @@ describe('Lockout notifications', function () {
             $table->id();
             $table->string('email')->unique();
             $table->string('password')->nullable();
-            $table->timestamp('blocked_at')->nullable();
+            $table->timestamp('locked_at')->nullable();
             $table->timestamps();
         });
 
@@ -51,11 +51,25 @@ describe('Lockout notifications', function () {
         expect($user)->not->toBeNull();
 
         Notification::assertSentTo(
-            [$user],
+            $user,
             AccountLocked::class,
-            function ($notification, $channels) {
+            function ($notification, $channels) use ($user, $email) {
                 // Basic sanity: notification instance is AccountLocked and channels is array
-                return $notification instanceof AccountLocked && is_array($channels);
+                if (!($notification instanceof AccountLocked) || !is_array($channels)) {
+                    return false;
+                }
+
+                // Build the MailMessage and assert it contains the expected subject and line
+                $mail = $notification->toMail($user);
+
+                $subjectOk = ($mail->subject ?? null) === 'Account Locked Due to Multiple Failed Login Attempts';
+
+                // Different Laravel versions expose the lines on MailMessage under different properties;
+                // try the common ones (introLines or lines) to be resilient.
+                $introLines = $mail->introLines ?? ($mail->lines ?? []);
+                $expectedLine = "Your account with identifier {$email} has been locked due to multiple failed login attempts.";
+
+                return $subjectOk && in_array($expectedLine, $introLines, true);
             }
         );
     });

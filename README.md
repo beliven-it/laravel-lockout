@@ -31,15 +31,32 @@ The package auto-registers its service provider.
 
 ## Publish
 
-Publish configuration and migrations:
+Publish configuration and migrations (local development)
 
+Note: this package is not yet published as a tagged release. To try it locally or during development, clone the repository and install it into your application (for example using a Composer path repository) or include it in your app once it is released.
+
+Recommended local workflow:
+1) Publish the config
 ```bash
 php artisan vendor:publish --tag="laravel-lockout-config"
+# then edit config/lockout.php as needed for your app
+```
+
+2) Publish and review the migration stubs
+```bash
 php artisan vendor:publish --tag="laravel-lockout-migrations"
+# review the published migration stubs in your application and adjust if necessary
 php artisan migrate
 ```
 
-Check `config/lockout.php` after publishing to tune behavior.
+Notes:
+- The package ships migration stubs for the audit logs and for the polymorphic `model_lockouts` table (the preferred place to store persistent locks and history).
+- Always review and, if needed, edit the published migration stubs so they match your application's schema and conventions before running `php artisan migrate`.
+- The package provides migration stubs:
+  - `create_lockout_logs_table` — creates the `lockout_logs` table used for audit entries.
+  - `create_model_lockouts_table` — creates the polymorphic `model_lockouts` table used for persistent locks and history.
+- Recommended flow: publish the config and review the migration stubs before publishing/running them so they align with your application's schema and conventions.
+- After publishing the migration stubs you may edit them (for example to change column placement or naming) before running `php artisan migrate`.
 
 ---
 
@@ -104,7 +121,7 @@ Defaults are safe for most apps; override env values to customize.
 ## Unlocking
 
 - When enabled, the package can send a signed unlock link to the user.
-- The link routes to an unlock controller that clears the model's `blocked_at`.
+- The link routes to an unlock controller that clears the model's active lock record in the `model_lockouts` table.
 - The unlock flow uses a temporary signed route and validates the signature.
 
 ---
@@ -114,7 +131,7 @@ Defaults are safe for most apps; override env values to customize.
 - `EntityLocked` — dispatched when an identifier reaches the threshold.
 - Default listeners:
   - record failed attempts (bound to auth `Failed` event),
-  - mark the model as locked (`blocked_at`) when `EntityLocked` fires,
+  - record a model lock in the `model_lockouts` table when `EntityLocked` fires,
   - send unlock notification if enabled.
 
 You can replace listeners or the notification class via your app's event provider or config to customize behavior.

@@ -1,0 +1,59 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * This migration creates a polymorphic `model_lockouts` table that stores
+     * lock records for any Eloquent model. The table is intentionally generic:
+     * - It uses `model_type` / `model_id` for a morph relation.
+     * - It keeps `locked_at` and `unlocked_at` timestamps to track active locks.
+     * - It optionally stores an `expires_at` timestamp, a short `reason` and a JSON `meta`.
+     *
+     * The table is indexed for efficient lookups by model and expiry.
+     */
+    public function up(): void
+    {
+        if (Schema::hasTable('model_lockouts')) {
+            return;
+        }
+
+        Schema::create('model_lockouts', function (Blueprint $table) {
+            $table->id();
+
+            // Polymorphic relation
+            $table->string('model_type');
+            $table->unsignedBigInteger('model_id');
+
+            // Lock tracking
+            $table->timestamp('locked_at')->useCurrent();
+            $table->timestamp('unlocked_at')->nullable()->default(null);
+            $table->timestamp('expires_at')->nullable()->default(null);
+
+            // Optional metadata
+            $table->string('reason')->nullable();
+            $table->json('meta')->nullable();
+
+            // Audit timestamps
+            $table->timestamps();
+
+            // Indexes
+            $table->index(['model_type', 'model_id'], 'model_lockouts_model_index');
+            $table->index('expires_at', 'model_lockouts_expires_at_index');
+            $table->index('unlocked_at', 'model_lockouts_unlocked_at_index');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('model_lockouts');
+    }
+};

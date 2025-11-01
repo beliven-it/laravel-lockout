@@ -38,14 +38,29 @@ class AccountLocked extends Notification
 
     /**
      * Get the mail representation of the notification.
+     *
+     * The message content is translation-ready so package users can
+     * customize the subject and lines via translation files.
+     *
+     * Expected translation keys (example):
+     *  - lockout.notifications.account_locked.subject
+     *  - lockout.notifications.account_locked.line1
+     *  - lockout.notifications.account_locked.line2
+     *  - lockout.notifications.account_locked.action
+     *  - lockout.notifications.account_locked.footer
+     *
+     * Each key may use the placeholders:
+     *  - :identifier  => the locked identifier (e.g. email)
+     *  - :minutes     => lockout duration in minutes
      */
     public function toMail(object $notifiable): MailMessage
     {
+
         return (new MailMessage)
-            ->subject('Account Locked Due to Multiple Failed Login Attempts')
-            ->line("Your account with identifier '{$this->identifier}' has been locked due to multiple failed login attempts.")
-            ->line("The lockout will last for {$this->lockoutDuration} minutes.")
-            ->action('Reset Your Password', url('/account/unlock'))
-            ->line('If you did not attempt to log in, please contact support immediately.');
+            ->subject(trans('lockout::lockout.notifications.account_locked.subject'))
+            ->line(trans('lockout::lockout.notifications.account_locked.line1', ['identifier' => $this->identifier]))
+            ->line(trans('lockout::lockout.notifications.account_locked.line2', ['minutes' => $this->lockoutDuration]))
+            ->action(trans('lockout::lockout.notifications.account_locked.action'), $this->signedUnlockUrl)
+            ->line(trans('lockout::lockout.notifications.account_locked.footer'));
     }
 }

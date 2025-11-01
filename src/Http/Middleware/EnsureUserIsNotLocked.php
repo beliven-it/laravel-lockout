@@ -3,35 +3,77 @@
 namespace Beliven\Lockout\Http\Middleware;
 
 use Beliven\Lockout\Facades\Lockout;
+use Closure;
+use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class EnsureUserIsNotLocked
 {
-    public function handle($request, \Closure $next)
+    public function handle($request, Closure $next)
     {
         $identifier = $request->input(Lockout::getLoginField());
+
         if (is_null($identifier)) {
             return $next($request);
         }
 
-        // First, check the persistent model flag (blocked_at) if a model exists.
-        // This ensures that once a model has been marked blocked we deny access
-        // immediately without relying solely on the cache state.
+        // If a model exists for the identifier and it has an active persistent lock,
+        // short-circuit with a 429 response.
         $model = Lockout::getLoginModel($identifier);
-        if ($model && isset($model->blocked_at) && $model->blocked_at) {
-            return response()->json([
-                'message' => __('Account blocked due to too many login attempts'),
-            ], 429);
+        if ($model && $this->modelHasActiveLock($model)) {
+            return $this->lockedResponse();
         }
 
-        // Fallback to checking the in-memory/cache attempt counter. This covers
-        // cases where the cache threshold was exceeded but the persistent model
-        // hasn't been updated yet.
+        // Otherwise, fall back to the in-memory/cache attempt counter.
         if (Lockout::hasTooManyAttempts($identifier)) {
-            return response()->json([
-                'message' => __('Account blocked due to too many login attempts'),
-            ], 429);
+            return $this->lockedResponse();
         }
 
         return $next($request);
+    }
+
+    /**
+     * Inspect the model for an active lock using available helpers.
+     *
+     * Returns true if an active lock exists, false otherwise.
+     */
+    protected function modelHasActiveLock($model): bool
+    {
+        // Prefer model-provided helper if available.
+        if (method_exists($model, 'activeLock')) {
+            try {
+                return $model->activeLock() !== null;
+            } catch (\Throwable $e) {
+                // Ignore errors and treat as not locked to keep middleware resilient.
+                return false;
+            }
+        }
+
+        // Fallback to querying the lockouts relation if present.
+        if (method_exists($model, 'lockouts')) {
+            try {
+                return (bool) $model->lockouts()
+                    ->whereNull('unlocked_at')
+                    ->where(function ($q) {
+                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    })
+                    ->exists();
+            } catch (\Throwable $e) {
+                // Ignore DB errors and treat as not locked.
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Build a standardized JSON response for locked accounts.
+     */
+    protected function lockedResponse(): JsonResponse
+    {
+        return response()->json([
+            'message' => trans('laravel-lockout::translations.middleware.account_locked'),
+        ], Response::HTTP_TOO_MANY_REQUESTS);
     }
 }

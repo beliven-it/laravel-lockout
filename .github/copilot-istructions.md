@@ -11,12 +11,14 @@ These instructions describe how to contribute to the `laravel-lockout` package, 
   - Create `lockout_logs` entries when locks occur (optionally associated to an Eloquent model).
   - Provide helpers to lock/unlock programmatically.
 - Key files and directories:
-  - `config/lockout.php` — configuration and environment-driven defaults.
   - `src/Http/Middleware/EnsureUserIsNotLocked.php` — middleware that prevents locked users from logging in.
-  - `src/Traits/HasLockout.php` — trait with helpers like `isLockedOut()`, `lock()`, `unlock()`, and the `lockoutLogs()` relation.
-  - `src/Lockout.php` (or service class) — core locking/unlocking logic and log creation.
-  - `src/Models/LockoutLog.php` — the log model, including a `morphTo` relation to linked models.
-  - `database/migrations/*_create_lockout_logs_table.php` — migration(s) creating the `lockout_logs` table; if you add model associations, use `nullableMorphs('model')`.
+  - `src/Traits/HasLockout.php` — trait providing helpers like `isLockedOut()`, `lock()`, `unlock()`, `lockouts()` and `activeLock()`; backed by the `model_lockouts` polymorphic table for persistent locks and history.
+  - `src/Lockout.php` (service) — core locking/unlocking logic, log creation and coordination with persistent lock records.
+  - `src/Models/LockoutLog.php` — the audit log model, including a `morphTo` relation to linked models.
+  - `src/Models/ModelLockout.php` — new model representing persistent lock records for any Eloquent model (polymorphic).
+  - `database/migrations/*_create_lockout_logs_table.php` — migration stub creating the `lockout_logs` audit table.
+  - `database/migrations/*_create_model_lockouts_table.php` — migration stub creating the `model_lockouts` table used for persistent locks and history.
+  - (legacy migration stub removed) Prefer the dedicated `create_model_lockouts_table` migration; persistent locks should be stored in the polymorphic `model_lockouts` table.
   - `tests/` — Unit and Feature tests (Pest or PHPUnit with Orchestra/Testbench for package integration).
   - `.github/workflows/ci.yml` — CI pipeline; ensures tests, static analysis and compatibility across PHP/Laravel/Testbench versions.
   - `phpstan.neon.dist` — phpstan configuration (use sparingly and justify additions).
@@ -114,13 +116,21 @@ Use quoted file names exactly as above (backticks when referenced in code or doc
 ---
 
 ## Working with migrations & model associations
+- Recommended approach (current):
+  - The package now uses a dedicated polymorphic `model_lockouts` table to store persistent locks and their history. This is the preferred, non-invasive approach for persistent lock state.
+  - The `model_lockouts` migration stub creates the following useful columns: `model_type`, `model_id`, `locked_at`, `unlocked_at`, `expires_at`, `reason`, `meta`, plus timestamps and appropriate indexes.
+  - Use the `HasLockout` trait (or the `lockouts()` relation) to create, query and clear locks. The trait exposes `lock()`, `unlock()`, `activeLock()` and `isLockedOut()` helpers to operate against `model_lockouts`.
 - Backwards compatibility:
-  - If you add `model_type` and `model_id` columns to `lockout_logs`, make them `nullable` so existing users don't break.
-  - Provide a migration snippet and a clear README note for users who already published the migration.
-- Tests:
-  - Add tests that cover both cases:
-    - Logs created without an associated model (existing behavior).
-    - Logs created with an associated model (new behavior) and accessible through the `lockoutLogs()` relation.
+  - If your application previously relied on a `locked_at` column on the auth table, migrate those values into the polymorphic `model_lockouts` table and remove the legacy column. New integrations should implement persistent locks using the `model_lockouts` table (preferred, non-invasive).
+  - Recommended migration approach: add a migration that copies existing `locked_at` values into `model_lockouts` records for the corresponding model rows, verify consumers have switched to `model_lockouts`, and then drop the legacy `locked_at` column. Document these steps in your application's migration notes or README.
+- Tests (must include):
+  - Unit/feature tests that verify creation of `model_lockouts` records when threshold is reached (via the Lockout service).
+  - Tests that assert `HasLockout::isLockedOut()` returns true when an active `model_lockouts` record exists and false otherwise.
+  - Tests that verify `HasLockout::lock()` creates an active `model_lockouts` record, and `unlock()` marks it unlocked (`unlocked_at` populated).
+  - Tests that ensure `lockout_logs` audit entries are still created for each failed attempt and that logs can optionally be associated to the model (morph).
+- Migration notes:
+  - The `model_lockouts` table is polymorphic and therefore works with any model. It is indexed on `model_type, model_id` for efficient lookups.
+  - When publishing and running migrations in consumer apps, recommend publishing the config (if you need to adjust `model_table` or other options) before publishing migrations. Document any manual steps in the README.
 
 ---
 

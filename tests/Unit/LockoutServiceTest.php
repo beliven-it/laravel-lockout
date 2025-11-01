@@ -144,7 +144,7 @@ describe('Lockout service', function () {
                 $table->id();
                 $table->string('email')->unique();
                 $table->string('password')->nullable();
-                $table->timestamp('blocked_at')->nullable();
+                $table->timestamp('locked_at')->nullable();
                 $table->timestamps();
             });
 

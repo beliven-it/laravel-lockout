@@ -47,46 +47,6 @@ describe('MarkModelAsLocked listener', function () {
         expect($model->locked)->toBeTrue();
     });
 
-    it('sets blocked_at and saves when model has no lock() method', function () {
-        $identifier = 'user-without-lock@example.test';
-
-        // Model that does NOT implement lock(), but has save() overriden to avoid DB interaction
-        $model = new class extends EloquentModel
-        {
-            public $blocked_at;
-
-            public $saved = false;
-
-            protected $table = 'users';
-
-            public $timestamps = false;
-
-            protected $guarded = [];
-
-            public function save(array $options = []): bool
-            {
-                $this->saved = true;
-
-                return true;
-            }
-        };
-
-        $mockService = Mockery::mock(LockoutService::class);
-        $mockService->shouldReceive('getLoginModel')->with($identifier)->once()->andReturn($model);
-
-        app()->instance(LockoutService::class, $mockService);
-
-        $listener = new MarkModelAsLocked;
-        $event = new EntityLocked($identifier, (object) ['ip' => '127.0.0.1']);
-
-        // Execute
-        $listener->handle($event);
-
-        // The listener should have set blocked_at and persisted via save()
-        expect($model->blocked_at)->not->toBeNull();
-        expect($model->saved)->toBeTrue();
-    });
-
     it('does nothing when no model is found for the identifier', function () {
         $identifier = 'nonexistent@example.test';
 

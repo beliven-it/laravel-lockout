@@ -158,6 +158,60 @@ class Lockout
                     $logModel->setAttribute('model_type', get_class($relatedModel));
                     $logModel->setAttribute('model_id', $relatedModel->getKey());
                 }
+
+                // If the attempt caused the identifier to be considered blocked (i.e. threshold reached)
+                // and there is no active lock recorded for the model yet, create a model lock record.
+                // This ensures the package records a persistent lock in the dedicated `model_lockouts`
+                // table when appropriate.
+                try {
+                    if ($this->hasTooManyAttempts($id)) {
+                        $hasActive = false;
+
+                        // Prefer model-provided activeLock() helper if available.
+                        if (method_exists($relatedModel, 'activeLock')) {
+                            try {
+                                $hasActive = (bool) $relatedModel->activeLock();
+                            } catch (\Throwable $_) {
+                                $hasActive = false;
+                            }
+                        } elseif (method_exists($relatedModel, 'lockouts')) {
+                            // Fallback: query the relation for an active lock.
+                            try {
+                                $hasActive = (bool) $relatedModel->lockouts()
+                                    ->whereNull('unlocked_at')
+                                    ->where(function ($q) {
+                                        $q->whereNull('expires_at')
+                                            ->orWhere('expires_at', '>', now());
+                                    })
+                                    ->exists();
+                            } catch (\Throwable $_) {
+                                $hasActive = false;
+                            }
+                        }
+
+                        // If no active lock exists, create one. Prefer calling the model's
+                        // `lock()` method when available so model-specific logic executes.
+                        if (!$hasActive) {
+                            if (method_exists($relatedModel, 'lock')) {
+                                try {
+                                    $relatedModel->lock();
+                                } catch (\Throwable $_) {
+                                    // swallow and continue; lock creation is best-effort here
+                                }
+                            } elseif (method_exists($relatedModel, 'lockouts')) {
+                                try {
+                                    $relatedModel->lockouts()->create([
+                                        'locked_at' => now(),
+                                    ]);
+                                } catch (\Throwable $_) {
+                                    // swallow and continue
+                                }
+                            }
+                        }
+                    }
+                } catch (\Throwable $_) {
+                    // Ignore any errors when attempting to inspect/create lock records.
+                }
             }
         } catch (\Throwable $e) {
             // If association fails for any reason, ignore and still persist the log.

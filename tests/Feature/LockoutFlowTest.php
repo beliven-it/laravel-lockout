@@ -21,6 +21,7 @@ describe('Lockout flow', function () {
         config()->set('auth.providers.users.model', \Beliven\Lockout\Tests\Fixtures\User::class);
 
         // Create tables needed for the package and tests
+        Schema::dropIfExists('model_lockouts');
         Schema::dropIfExists('lockout_logs');
         Schema::dropIfExists('users');
 
@@ -28,8 +29,21 @@ describe('Lockout flow', function () {
             $table->id();
             $table->string('email')->unique();
             $table->string('password')->nullable();
-            $table->timestamp('blocked_at')->nullable();
             $table->timestamps();
+        });
+
+        Schema::create('model_lockouts', function (Blueprint $table) {
+            $table->id();
+            $table->string('model_type');
+            $table->unsignedBigInteger('model_id');
+            $table->timestamp('locked_at')->nullable();
+            $table->timestamp('unlocked_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
+            $table->string('reason')->nullable();
+            $table->json('meta')->nullable();
+            $table->timestamps();
+
+            $table->index(['model_type', 'model_id']);
         });
 
         Schema::create('lockout_logs', function (Blueprint $table) {
@@ -56,6 +70,7 @@ describe('Lockout flow', function () {
 
     afterEach(function () {
         // Clean up tables to avoid leaking state between tests
+        Schema::dropIfExists('model_lockouts');
         Schema::dropIfExists('lockout_logs');
         Schema::dropIfExists('users');
         $cacheStore = Cache::store('array');
@@ -82,7 +97,7 @@ describe('Lockout flow', function () {
         expect($log->identifier)->toBe($identifier);
     });
 
-    it('locks the account after reaching max attempts and sets blocked_at', function () {
+    it('locks the account after reaching max attempts and sets locked_at', function () {
         $identifier = 'test@example.com';
 
         // Sanity: max attempts configured to 2 in beforeEach
@@ -95,12 +110,22 @@ describe('Lockout flow', function () {
         // Now the service should consider the identifier blocked
         expect(Lockout::hasTooManyAttempts($identifier))->toBeTrue();
 
-        // The model should have been marked as blocked (blocked_at set)
+        // The model should have been marked as locked (a model_lockouts record exists)
         $user = \Beliven\Lockout\Tests\Fixtures\User::query()->where('email', $identifier)->first();
         expect($user)->not->toBeNull();
         // Reload fresh from DB to ensure listeners persisted the change
         $user->refresh();
-        expect($user->blocked_at)->not->toBeNull();
+
+        $exists = DB::table('model_lockouts')
+            ->where('model_type', \Beliven\Lockout\Tests\Fixtures\User::class)
+            ->where('model_id', $user->id)
+            ->whereNull('unlocked_at')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->exists();
+
+        expect($exists)->toBeTrue();
 
         // And an EntityLocked dispatch should have generated another log entry as well
         $logsCount = DB::table('lockout_logs')->where('identifier', $identifier)->count();
