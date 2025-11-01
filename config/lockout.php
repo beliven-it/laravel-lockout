@@ -42,6 +42,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Unlock link expiry (minutes)
+    |--------------------------------------------------------------------------
+    |
+    | 'unlock_link_minutes' (int)
+    | Env: LOCKOUT_UNLOCK_LINK_MINUTES
+    | Default: 1440
+    |
+    | Duration, in minutes, for the temporary signed unlock URL generated
+    | by the package. The default value of 1440 corresponds to 24 hours.
+    | Adjust this value to increase/decrease the signed URL lifetime.
+    |
+    */
+    'unlock_link_minutes' => (int) env('LOCKOUT_UNLOCK_LINK_MINUTES', 1440),
+
+    /*
+    |--------------------------------------------------------------------------
     | Notification class
     |--------------------------------------------------------------------------
     |

@@ -92,7 +92,9 @@ class Lockout
         $notificationClass = config('lockout.notification_class', \Beliven\Lockout\Notifications\AccountLocked::class);
         $lockoutDuration = $this->decayMinutes;
 
-        $signedUnlockUrl = URL::temporarySignedRoute('lockout.unlock', now()->addDay(), [
+        // Use configurable lifetime for the temporary signed unlock URL (minutes)
+        $minutes = (int) config('lockout.unlock_link_minutes', 1440);
+        $signedUnlockUrl = URL::temporarySignedRoute('lockout.unlock', now()->addMinutes($minutes), [
             'identifier' => $id,
             'entropy'    => Str::random(32),
         ]);
