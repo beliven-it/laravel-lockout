@@ -29,44 +29,25 @@ The package auto-registers its service provider.
 
 ---
 
-## Publish
+## Publishable contents
 
-Publish configuration and migrations (local development)
-
-Note: this package is not yet published as a tagged release. To try it locally or during development, clone the repository and install it into your application (for example using a Composer path repository) or include it in your app once it is released.
-
-Recommended local workflow:
 1) Publish the config
 ```bash
-php artisan vendor:publish --tag="laravel-lockout-config"
-# then edit config/lockout.php as needed for your app
+php artisan vendor:publish --tag="lockout-config"
 ```
 
 2) Publish and review the migration stubs
 ```bash
-php artisan vendor:publish --tag="laravel-lockout-migrations"
-# review the published migration stubs in your application and adjust if necessary
+php artisan vendor:publish --tag="lockout-migrations"
 php artisan migrate
 ```
 
-Notes:
-- The package ships migration stubs for the audit logs and for the polymorphic `model_lockouts` table (the preferred place to store persistent locks and history).
-- Always review and, if needed, edit the published migration stubs so they match your application's schema and conventions before running `php artisan migrate`.
-- The package provides migration stubs:
-  - `create_lockout_logs_table` — creates the `lockout_logs` table used for audit entries.
-  - `create_model_lockouts_table` — creates the polymorphic `model_lockouts` table used for persistent locks and history.
-- Recommended flow: publish the config and review the migration stubs before publishing/running them so they align with your application's schema and conventions.
-- After publishing the migration stubs you may edit them (for example to change column placement or naming) before running `php artisan migrate`.
-
 ---
 
-## Quick start (3 steps)
+## Setup
 
-1. Add the trait (optional convenience) to your auth model:
+1. Add the trait to your auth model:
 
-- Use the `HasLockout` trait on your `User` model to get `isLockedOut()`, `lock()`, `unlock()`.
-
-Trait example:
 ```php
 <?php
 namespace App\Models;
@@ -81,11 +62,8 @@ class User extends Authenticatable
 }
 ```
 
-2. Protect the login route:
+2. Apply the middleware to your login route:
 
-- Apply the `EnsureUserIsNotLocked` middleware to your login route to prevent requests from locked identifiers (returns 429).
-
-Middleware example:
 ```php
 <?php
 use Beliven\Lockout\Http\Middleware\EnsureUserIsNotLocked;
@@ -94,47 +72,56 @@ Route::post('/login', [LoginController::class, 'login'])
     ->middleware(EnsureUserIsNotLocked::class);
 ```
 
-3. Let the package record failed attempts:
-
-- The package listens to Laravel's authentication `Failed` event and increments attempts automatically. When the configured threshold is reached the package will dispatch `EntityLocked` and listeners will handle side effects.
-
 ---
 
-## Behavior & config (short)
+## Configuration
 
-Key config options (in `config/lockout.php`):
+Configuration options are well described in `config/lockout.php`. Here is a brief overview with defaults:
 
-| Environment variable | Config key | Default | Description |
-|---|---:|---|---|
-| `LOCKOUT_LOGIN_FIELD` | `login_field` | `email` | Field used as identifier (e.g. email or username). |
-| `LOCKOUT_UNLOCK_VIA_NOTIFICATION` | `unlock_via_notification` | `true` | Whether to send a signed unlock link via notification. |
-| `LOCKOUT_NOTIFICATION_CLASS` | `notification_class` | `\Beliven\Lockout\Notifications\AccountLocked::class` | Notification class used to notify the user when locked. |
-| `LOCKOUT_NOTIFICATION_CHANNELS` | `notification_channels` | `['mail']` | Channels used for the notification (e.g. `mail`, `database`). |
-| `LOCKOUT_MAX_ATTEMPTS` | `max_attempts` | `5` | Number of failed attempts before lockout. |
-| `LOCKOUT_DECAY_MINUTES` | `decay_minutes` | `30` | Time window (minutes) to count failed attempts. |
-| `LOCKOUT_CACHE_STORE` | `cache_store` | `database` | Cache store used for counters (e.g. `redis`, `database`, `array`). |
+```php
+<?php
+
+return [
+    'login_field' => 'email',
+    'unlock_via_notification' => true,
+    'notification_class' => \Beliven\Lockout\Notifications\AccountLocked::class,
+    'notification_channels' => ['mail'],
+    'max_attempts' => 5,
+    'decay_minutes' => 30,
+    'cache_store' => 'database',
+    'auto_unlock_hours' => 0,
+    'prune' => [
+        'enabled' => true,
+        'lockout_logs_days' => 90,
+        'model_lockouts_days' => 365,
+    ],
+];
+
+```
 
 Defaults are safe for most apps; override env values to customize.
 
 ---
 
-## Unlocking
+## Behaviors
+
+### Unlocking
 
 - When enabled, the package can send a signed unlock link to the user.
 - The link routes to an unlock controller that clears the model's active lock record in the `model_lockouts` table.
 - The unlock flow uses a temporary signed route and validates the signature.
 
-## Pruning & retention
+### Pruning & retention
 
 The package records both short-term throttling state (cache-based counters) and persistent records (`model_lockouts` and `lockout_logs`). Keeping a history of lock events is useful for auditing and security analysis, but historic data can accumulate over time. The package provides a configurable pruning facility to remove old records.
 
-Configuration
+#### Configuration
 - `config/lockout.php` exposes a `prune` section (enabled by default) with:
   - `prune.enabled` (bool) — enable/disable pruning
   - `prune.lockout_logs_days` (int) — days to retain `lockout_logs` (default: 90)
   - `prune.model_lockouts_days` (int) — days to retain `model_lockouts` history (default: 365)
 
-Artisan command
+#### Artisan command
 - Use the included command to prune old records:
 
   - `php artisan lockout:prune`  
@@ -146,26 +133,17 @@ Artisan command
     - `--only-logs` / `--only-model` — prune only one table
     - `--force` — run without confirmation (suitable for scheduler)
 
-Behavior
+#### Behavior
 - `lockout_logs` pruning removes log entries older than the configured cutoff (based on the `attempted_at` timestamp).
 - `model_lockouts` pruning removes unlocked historical lock records only (records where `unlocked_at` is not null and older than the configured cutoff). Active locks are never automatically pruned by this command.
 
-Database-level protection (recommended)
-- To avoid duplicate *active* locks in concurrent environments, consider adding a database-level guarantee where supported:
-  - On PostgreSQL you can create a partial unique index to prevent more than one active lock per model:
-    ```sql
-    CREATE UNIQUE INDEX uq_model_lockouts_active ON model_lockouts (model_type, model_id) WHERE unlocked_at IS NULL;
-    ```
-  - The package includes an optional migration stub demonstrating this approach; adapt it to your environment (note: `CONCURRENTLY` index creation on Postgres must be handled specially outside transactions for zero-downtime index builds).
-- Even with DB protection, the package uses a transaction + `lockForUpdate()` when creating a new persistent lock to minimize race conditions.
-
-Scheduling
+#### Scheduling
 - It's recommended to run the prune command regularly (e.g. nightly) via Laravel's scheduler:
   ```php
   $schedule->command('lockout:prune --force')->daily();
   ```
 
-Notes
+#### Notes
 - Pruning is best-effort and configurable; keep audit requirements in mind when choosing retention durations.
 - If you prefer a lighter approach (no history), you can configure the application to delete lock records on unlock — but consider keeping `lockout_logs` for auditing.
 
@@ -193,7 +171,10 @@ Association to a model
 Migration note
 - The package migration uses a nullable polymorphic relation for this association. The migration stub creates nullable morph columns (for example `nullableMorphs('model')`), so the table contains `model_type` and `model_id` as nullable columns.
 - If you have already published the migrations previously, update your `lockout_logs` table to include the nullable morph columns or re-publish the package migration. Example schema snippet used by the package:
+
 ```php
+<?php
+//....
 $table->nullableMorphs('model');
 $table->string('identifier')->nullable();
 $table->string('ip_address')->nullable();
@@ -203,6 +184,8 @@ $table->timestamp('attempted_at');
 
 Usage example
 ```php
+<?php
+// ...
 use Beliven\Lockout\Models\LockoutLog;
 use App\Models\User; // Replace with your actual auth model namespace
 
@@ -216,9 +199,6 @@ $user = User::where('email', 'test@example.com')->first();
 $recentAttempts = $user->lockoutLogs()->latest('attempted_at')->take(10)->get();
 $attemptsCount = $user->lockoutLogs()->count();
 ```
-
-Compatibility
-- This change is backward compatible: logs are still recorded with identifier and metadata even when no model exists or when association fails. The association step is attempted but non-fatal so logging will never prevent the lockout flow.
 
 ---
 

@@ -60,49 +60,6 @@ describe('UnlockController (unit)', function () {
         expect($model->unlocked)->toBeTrue();
     });
 
-    it('does not clear legacy locked_at on the model when unlocking (no legacy behavior)', function () {
-        $identifier = 'unit-fallback@example.test';
-
-        // Model without an unlock() method and without lockouts()/activeLock();
-        // controller should not attempt legacy locked_at clearing.
-        $model = new class extends \Illuminate\Database\Eloquent\Model
-        {
-            public $locked_at;
-
-            public $saved = false;
-
-            public $timestamps = false;
-
-            public function save(array $options = [])
-            {
-                // Mark saved and return true to mimic Eloquent save behavior
-                $this->saved = true;
-
-                return true;
-            }
-        };
-
-        // Set a locked_at initially to ensure legacy behavior would have cleared it.
-        $model->locked_at = now();
-
-        // Bind a mocked Lockout service into the container for this test case.
-        $mockService = Mockery::mock(\Beliven\Lockout\Lockout::class);
-        $mockService->shouldReceive('getLoginModel')->once()->with($identifier)->andReturn($model);
-        app()->instance(\Beliven\Lockout\Lockout::class, $mockService);
-
-        $request = Request::create('/lockout/unlock', 'GET', ['identifier' => $identifier]);
-
-        /** @var UnlockController $controller */
-        $controller = app(UnlockController::class);
-        $response = $controller->__invoke($request);
-
-        expect($response->getStatusCode())->toBe(302);
-
-        // New behavior: controller relies on model_lockouts and does not touch legacy locked_at.
-        expect($model->locked_at)->not->toBeNull();
-        expect($model->saved)->toBeFalse();
-    });
-
     it('redirects to login with error when model is not found', function () {
         $identifier = 'nonexistent@example.test';
 

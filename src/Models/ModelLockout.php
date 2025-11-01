@@ -33,6 +33,8 @@ class ModelLockout extends Model
 
     // Allow mass-assignment for these attributes when creating locks via relationships.
     protected $fillable = [
+        'model_type',
+        'model_id',
         'locked_at',
         'unlocked_at',
         'expires_at',

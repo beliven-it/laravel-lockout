@@ -19,8 +19,6 @@ it('prunes old lockout_logs and unlocked model_lockouts according to retention c
         'ip_address'   => null,
         'user_agent'   => null,
         'attempted_at' => $oldLogTimestamp,
-        'created_at'   => Carbon::now(),
-        'updated_at'   => Carbon::now(),
     ]);
 
     // Insert a model_lockout that has been unlocked and is older than the cutoff.

@@ -151,7 +151,7 @@ return [
     |    expired items, handle it via a listener/command or during pruning.
     |
     */
-    'auto_unlock_hours' => (int) env('LOCKOUT_AUTO_UNLOCK_HOURS', 0),
+    'auto_unlock_hours' => (int) env('LOCKOUT_AUTO_UNLOCK_HOURS', 1),
 
     /*
     |--------------------------------------------------------------------------

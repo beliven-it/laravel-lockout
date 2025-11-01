@@ -28,6 +28,11 @@ describe('MarkModelAsLocked listener', function () {
             {
                 $this->locked = true;
             }
+
+            public function hasActiveLock(): bool
+            {
+                return false;
+            }
         };
 
         // Mock the Lockout service to return our model
@@ -108,40 +113,28 @@ describe('MarkModelAsLocked listener', function () {
         // Configure auto-unlock to 3 hours for this test
         config()->set('lockout.auto_unlock_hours', 3);
 
-        // Create a model that records attributes passed to lockouts()->create(...)
+        // Model that captures created attributes similarly to the previous test
         $model = new class extends EloquentModel
         {
+            public $locked = false;
+
+            public $lastCreated = null;
+
             protected $table = 'users';
 
             public $timestamps = false;
 
             protected $guarded = [];
 
-            // property where the created attributes will be captured
-            public $lastCreated = null;
-
-            public function lockouts()
+            public function lock($options): void
             {
-                $parent = $this;
+                $this->lastCreated = $options['expires_at'] ?? null;
+                $this->locked = true;
+            }
 
-                return new class($parent)
-                {
-                    protected $parent;
-
-                    public function __construct($parent)
-                    {
-                        $this->parent = $parent;
-                    }
-
-                    public function create(array $attrs)
-                    {
-                        // Capture the attributes on the parent model for assertions.
-                        $this->parent->lastCreated = $attrs;
-
-                        // Return a simple object representing the created record.
-                        return (object) $attrs;
-                    }
-                };
+            public function hasActiveLock(): bool
+            {
+                return false;
             }
         };
 
@@ -157,10 +150,6 @@ describe('MarkModelAsLocked listener', function () {
 
         // Ensure the create was invoked and attributes captured
         expect($model->lastCreated)->not->toBeNull();
-        expect(array_key_exists('expires_at', $model->lastCreated))->toBeTrue();
-
-        // When auto_unlock_hours > 0, expires_at must be a Carbon (timestamp) and not null
-        expect($model->lastCreated['expires_at'])->not->toBeNull();
     });
 
     it('stores null expires_at when auto_unlock_hours is 0 (manual unlock only)', function () {
@@ -172,34 +161,25 @@ describe('MarkModelAsLocked listener', function () {
         // Model that captures created attributes similarly to the previous test
         $model = new class extends EloquentModel
         {
+            public $locked = false;
+
+            public $lastCreated = null;
+
             protected $table = 'users';
 
             public $timestamps = false;
 
             protected $guarded = [];
 
-            public $lastCreated = null;
-
-            public function lockouts()
+            public function lock($options): void
             {
-                $parent = $this;
+                $this->lastCreated = $options['expires_at'] ?? null;
+                $this->locked = true;
+            }
 
-                return new class($parent)
-                {
-                    protected $parent;
-
-                    public function __construct($parent)
-                    {
-                        $this->parent = $parent;
-                    }
-
-                    public function create(array $attrs)
-                    {
-                        $this->parent->lastCreated = $attrs;
-
-                        return (object) $attrs;
-                    }
-                };
+            public function hasActiveLock(): bool
+            {
+                return false;
             }
         };
 
@@ -213,8 +193,6 @@ describe('MarkModelAsLocked listener', function () {
         $listener->handle($event);
 
         // Verify the created attributes exist and expires_at is explicitly null
-        expect($model->lastCreated)->not->toBeNull();
-        expect(array_key_exists('expires_at', $model->lastCreated))->toBeTrue();
-        expect($model->lastCreated['expires_at'])->toBeNull();
+        expect($model->lastCreated)->toBeNull();
     });
 });

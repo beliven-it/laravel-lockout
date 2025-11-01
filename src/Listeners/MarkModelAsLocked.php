@@ -4,6 +4,7 @@ namespace Beliven\Lockout\Listeners;
 
 use Beliven\Lockout\Events\EntityLocked;
 use Beliven\Lockout\Facades\Lockout;
+use Illuminate\Database\Eloquent\Model;
 use Throwable;
 
 class MarkModelAsLocked
@@ -17,78 +18,49 @@ class MarkModelAsLocked
         // from lockout handling into the host application.
         try {
             $identifier = $event->identifier;
-
-            // Resolve the concrete model via the Lockout facade (single-model strategy).
-            try {
-                $model = Lockout::getLoginModel($identifier);
-            } catch (Throwable $_) {
-                $model = null;
-            }
+            $model = $this->resolveModel($identifier);
 
             if (!$model) {
                 return;
             }
 
-            // Prefer model-provided lock logic when available.
-            if (method_exists($model, 'lock')) {
-                try {
-                    $model->lock();
-                } catch (Throwable $_) {
-                    // If model->lock() throws, swallow and avoid breaking the app.
-                }
-
+            // Only proceed when the model exposes the HasLockout trait helpers.
+            // This keeps the listener simple: we rely on trait methods
+            // (`hasActiveLock()` and `lock()`) and avoid managing many cases.
+            if (!method_exists($model, 'hasActiveLock') || !method_exists($model, 'lock')) {
                 return;
             }
 
-            // Otherwise, attempt to create a lock record via the model's relation.
-            // Avoid creating duplicate active lock records by checking for an existing active lock
-            // before creating a new one.
-            if (method_exists($model, 'lockouts')) {
-                try {
-                    $hasActive = false;
-
-                    // Prefer model-provided activeLock() helper if available.
-                    if (method_exists($model, 'activeLock')) {
-                        try {
-                            $hasActive = (bool) $model->activeLock();
-                        } catch (Throwable $_) {
-                            $hasActive = false;
-                        }
-                    } else {
-                        // Fallback: query the relation for an active lock.
-                        try {
-                            $hasActive = (bool) $model->lockouts()
-                                ->whereNull('unlocked_at')
-                                ->where(function ($q) {
-                                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                                })
-                                ->exists();
-                        } catch (Throwable $_) {
-                            $hasActive = false;
-                        }
-                    }
-
-                    if (!$hasActive) {
-                        // Determine expiry based on configuration. If auto_unlock_hours is 0,
-                        // we store a null expires_at (manual unlock). Otherwise compute expiry.
-                        $autoHours = (int) config('lockout.auto_unlock_hours', 0);
-                        $attributes = [
-                            'locked_at' => now(),
-                        ];
-                        if ($autoHours > 0) {
-                            $attributes['expires_at'] = now()->addHours($autoHours);
-                        } else {
-                            $attributes['expires_at'] = null;
-                        }
-
-                        $model->lockouts()->create($attributes);
-                    }
-                } catch (Throwable $_) {
-                    // Relation-based creation failed; swallow to keep flow resilient.
-                }
+            if ($model->hasActiveLock()) {
+                return;
             }
+
+            $model->lock([
+                'expires_at' => $this->getExpiresAtAttribute(),
+            ]);
         } catch (Throwable $_) {
             // Never allow exceptions to bubble out of this listener.
         }
+    }
+
+    /**
+     * Resolve the login model for the given identifier.
+     *
+     * Returns null on failure or if the model cannot be resolved.
+     */
+    protected function resolveModel(mixed $identifier): ?Model
+    {
+        try {
+            return Lockout::getLoginModel($identifier);
+        } catch (Throwable $_) {
+            return null;
+        }
+    }
+
+    protected function getExpiresAtAttribute()
+    {
+        $autoHours = (int) config('lockout.auto_unlock_hours', 0);
+
+        return $autoHours > 0 ? now()->addHours($autoHours) : null;
     }
 }

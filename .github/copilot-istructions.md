@@ -18,7 +18,6 @@ These instructions describe how to contribute to the `laravel-lockout` package, 
   - `src/Models/ModelLockout.php` — new model representing persistent lock records for any Eloquent model (polymorphic).
   - `database/migrations/*_create_lockout_logs_table.php` — migration stub creating the `lockout_logs` audit table.
   - `database/migrations/*_create_model_lockouts_table.php` — migration stub creating the `model_lockouts` table used for persistent locks and history.
-  - (legacy migration stub removed) Prefer the dedicated `create_model_lockouts_table` migration; persistent locks should be stored in the polymorphic `model_lockouts` table.
   - `tests/` — Unit and Feature tests (Pest or PHPUnit with Orchestra/Testbench for package integration).
   - `.github/workflows/ci.yml` — CI pipeline; ensures tests, static analysis and compatibility across PHP/Laravel/Testbench versions.
   - `phpstan.neon.dist` — phpstan configuration (use sparingly and justify additions).

@@ -52,6 +52,22 @@ trait HasLockout
     }
 
     /**
+     * Determine whether the model currently has an active lock.
+     *
+     * This is a boolean helper that mirrors the logic in `activeLock()` but uses
+     * an `exists()` query for efficiency when only presence is required.
+     */
+    public function hasActiveLock(): bool
+    {
+        return (bool) $this->lockouts()
+            ->whereNull('unlocked_at')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->exists();
+    }
+
+    /**
      * Determine if the model is considered locked.
      *
      * This checks both the persistent lock records (ModelLockout) and the
@@ -59,8 +75,8 @@ trait HasLockout
      */
     public function isLockedOut(): bool
     {
-        // Check persistent lock records first
-        if ($this->activeLock() !== null) {
+        // Check persistent lock records first (use efficient boolean helper).
+        if ($this->hasActiveLock()) {
             return true;
         }
 
@@ -90,14 +106,7 @@ trait HasLockout
      */
     public function lock(array $options = []): ModelLockout
     {
-        $attributes = [
-            'locked_at'  => $options['locked_at'] ?? now(),
-            'expires_at' => $options['expires_at'] ?? null,
-            'reason'     => $options['reason'] ?? null,
-            'meta'       => $options['meta'] ?? null,
-        ];
-
-        return $this->lockouts()->create($attributes);
+        return Lockout::lockModel($this, $options);
     }
 
     /**
@@ -105,11 +114,8 @@ trait HasLockout
      *
      * If no active lock exists this is a no-op.
      */
-    public function unlock(): void
+    public function unlock(array $options = []): ?ModelLockout
     {
-        $lock = $this->activeLock();
-        if ($lock) {
-            $lock->markUnlocked();
-        }
+        return Lockout::unlockModel($this);
     }
 }

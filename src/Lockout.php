@@ -131,9 +131,32 @@ class Lockout
         return $modelClass::where($this->getLoginField(), $identifier)->first();
     }
 
-    protected function throttleKey(string $id): string
+    public function lockModel(Model $model): ?ModelLockout
     {
-        return 'login-attempts:' . $id;
+        $attributes = [
+            'locked_at'  => $options['locked_at'] ?? now(),
+            'expires_at' => $options['expires_at'] ?? null,
+            'reason'     => $options['reason'] ?? null,
+            'meta'       => $options['meta'] ?? null,
+        ];
+
+        return $model->lockouts()->create($attributes);
+    }
+
+    public function unlockModel(Model $model): ?ModelLockout
+    {
+        $lock = $model->activeLock();
+        if (!$lock) {
+            return null;
+        }
+
+        $lock->markUnlocked();
+
+        $loginField = $this->getLoginField();
+        $identifierValue = $model->$loginField ?? null;
+        $this->clearAttempts($identifierValue);
+
+        return $lock;
     }
 
     /**
@@ -173,5 +196,10 @@ class Lockout
         }
 
         $logModel->save();
+    }
+
+    protected function throttleKey(string $id): string
+    {
+        return 'login-attempts:' . $id;
     }
 }
