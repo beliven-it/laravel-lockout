@@ -3,7 +3,6 @@
 namespace Beliven\Lockout\Http\Middleware;
 
 use Beliven\Lockout\Facades\Lockout;
-use Beliven\Lockout\Models\ModelLockout;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -21,9 +20,7 @@ class EnsureUserIsNotLocked
 
         // If a model exists for the identifier and it has an active persistent lock,
         // short-circuit with a 429 response.
-        $model = ModelLockout::active()
-            ->where('identifier', $identifier)
-            ->first()?->model;
+        $model = Lockout::getLoginModel($identifier);
 
         if ($model && $this->modelHasActiveLock($model)) {
             return $this->lockedResponse();

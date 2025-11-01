@@ -78,13 +78,13 @@ class Lockout
 
     public function attemptSendLockoutNotification(string $id, object $data): void
     {
-        // When the use disable the unlock via notification feature
+        // When the user disables the unlock via notification feature
         // we can skip sending the notification
         if (!$this->unlockViaNotification) {
             return;
         }
 
-        // Check also if the column is a valid email format
+        // Check also if the identifier is a valid email format
         if (!filter_var($id, FILTER_VALIDATE_EMAIL)) {
             return;
         }
@@ -99,10 +99,8 @@ class Lockout
 
         $notification = new $notificationClass($id, $this->decayMinutes, $signedUnlockUrl);
 
-        $model = ModelLockout::active()
-            ->where('identifier', $id)
-            ->first()?->model;
-
+        // Resolve the login model using the single-model strategy configured in auth.providers.users.model
+        $model = $this->getLoginModel($id);
         if (!$model) {
             return;
         }
@@ -117,6 +115,20 @@ class Lockout
     public function getLoginField(): string
     {
         return config('lockout.login_field', 'email');
+    }
+
+    public function getLoginModelClass(): string
+    {
+        $loginField = $this->getLoginField();
+
+        return config('auth.providers.users.model');
+    }
+
+    public function getLoginModel(string $identifier): ?Model
+    {
+        $modelClass = $this->getLoginModelClass();
+
+        return $modelClass::where($this->getLoginField(), $identifier)->first();
     }
 
     protected function throttleKey(string $id): string
@@ -147,6 +159,18 @@ class Lockout
         $logModel->ip_address = $data->ip ?? null;
         $logModel->user_agent = $data->user_agent ?? null;
         $logModel->attempted_at = now();
+
+        // Attempt to associate the created log with the configured login model
+        // (single-model strategy). Be defensive: swallow any errors so tests and
+        // constrained environments without the users table do not fail.
+        try {
+            $model = $this->getLoginModel($id);
+            if ($model instanceof Model) {
+                $logModel->model()->associate($model);
+            }
+        } catch (\Throwable $_) {
+            // ignore association failures
+        }
 
         $logModel->save();
     }

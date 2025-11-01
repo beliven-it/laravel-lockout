@@ -3,8 +3,7 @@
 namespace Beliven\Lockout\Listeners;
 
 use Beliven\Lockout\Events\EntityLocked;
-use Beliven\Lockout\Lockout as LockoutService;
-use Beliven\Lockout\Models\ModelLockout;
+use Beliven\Lockout\Facades\Lockout;
 use Throwable;
 
 class MarkModelAsLocked
@@ -19,11 +18,12 @@ class MarkModelAsLocked
         try {
             $identifier = $event->identifier;
 
-            // Resolve the Lockout service and model for the identifier.
-            $lockout = app(LockoutService::class);
-            $model = ModelLockout::active()
-                ->where('identifier', $identifier)
-                ->first()?->model;
+            // Resolve the concrete model via the Lockout facade (single-model strategy).
+            try {
+                $model = Lockout::getLoginModel($identifier);
+            } catch (Throwable $_) {
+                $model = null;
+            }
 
             if (!$model) {
                 return;

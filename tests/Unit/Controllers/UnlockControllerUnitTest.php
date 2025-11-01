@@ -39,8 +39,12 @@ describe('UnlockController (unit)', function () {
             }
         };
 
-        // Expect the Lockout facade to return our model for the identifier
-        Lockout::shouldReceive('getLoginModel')->once()->with($identifier)->andReturn($model);
+        // Mock the Lockout service and bind it into the container so the controller
+        // resolves the mocked instance instead of the facade. This mirrors how the
+        // listener and other code resolve the service via the container.
+        $mockService = Mockery::mock(\Beliven\Lockout\Lockout::class);
+        $mockService->shouldReceive('getLoginModel')->once()->with($identifier)->andReturn($model);
+        app()->instance(\Beliven\Lockout\Lockout::class, $mockService);
 
         $request = Request::create('/lockout/unlock', 'GET', ['identifier' => $identifier]);
 
@@ -81,7 +85,10 @@ describe('UnlockController (unit)', function () {
         // Set a locked_at initially to ensure legacy behavior would have cleared it.
         $model->locked_at = now();
 
-        Lockout::shouldReceive('getLoginModel')->once()->with($identifier)->andReturn($model);
+        // Bind a mocked Lockout service into the container for this test case.
+        $mockService = Mockery::mock(\Beliven\Lockout\Lockout::class);
+        $mockService->shouldReceive('getLoginModel')->once()->with($identifier)->andReturn($model);
+        app()->instance(\Beliven\Lockout\Lockout::class, $mockService);
 
         $request = Request::create('/lockout/unlock', 'GET', ['identifier' => $identifier]);
 
@@ -99,8 +106,10 @@ describe('UnlockController (unit)', function () {
     it('redirects to login with error when model is not found', function () {
         $identifier = 'nonexistent@example.test';
 
-        // Lockout returns null when no model found
-        Lockout::shouldReceive('getLoginModel')->once()->with($identifier)->andReturn(null);
+        // Bind a mocked Lockout service that returns null so controller handles not-found flow.
+        $mockService = Mockery::mock(\Beliven\Lockout\Lockout::class);
+        $mockService->shouldReceive('getLoginModel')->once()->with($identifier)->andReturn(null);
+        app()->instance(\Beliven\Lockout\Lockout::class, $mockService);
 
         $request = Request::create('/lockout/unlock', 'GET', ['identifier' => $identifier]);
 

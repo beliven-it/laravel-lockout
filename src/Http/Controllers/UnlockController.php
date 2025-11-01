@@ -3,7 +3,6 @@
 namespace Beliven\Lockout\Http\Controllers;
 
 use Beliven\Lockout\Facades\Lockout;
-use Beliven\Lockout\Models\ModelLockout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -12,9 +11,7 @@ class UnlockController
     public function __invoke(Request $request): RedirectResponse
     {
         $identifier = $this->resolveIdentifier($request);
-        $model = ModelLockout::active()
-            ->where('identifier', $identifier)
-            ->first()?->model;
+        $model = Lockout::getLoginModel($identifier);
 
         if (!$model) {
             return $this->redirectWithError();
