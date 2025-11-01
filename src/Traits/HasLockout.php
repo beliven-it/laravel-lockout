@@ -2,7 +2,6 @@
 
 namespace Beliven\Lockout\Traits;
 
-use Beliven\Lockout\Facades\Lockout;
 use Beliven\Lockout\Models\ModelLockout;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
@@ -68,6 +67,18 @@ trait HasLockout
     }
 
     /**
+     * Resolve the Lockout service instance.
+     *
+     * This method exists so consumers and tests can override the returned
+     * implementation (for example by extending the model and overriding this
+     * method). By default it resolves the package service from the container.
+     */
+    protected function resolveLockoutService(): \Beliven\Lockout\Lockout
+    {
+        return app(\Beliven\Lockout\Lockout::class);
+    }
+
+    /**
      * Determine if the model is considered locked.
      *
      * This checks both the persistent lock records (ModelLockout) and the
@@ -81,14 +92,15 @@ trait HasLockout
         }
 
         // Fallback to the lockout service's attempt counter.
-        $identifier = Lockout::getLoginField();
+        $service = $this->resolveLockoutService();
+        $identifier = $service->getLoginField();
 
         // Guard in case the model does not expose the configured login field.
         if (!isset($this->{$identifier})) {
             return false;
         }
 
-        return Lockout::hasTooManyAttempts((string) $this->{$identifier});
+        return $service->hasTooManyAttempts((string) $this->{$identifier});
     }
 
     /**
@@ -106,7 +118,7 @@ trait HasLockout
      */
     public function lock(array $options = []): ModelLockout
     {
-        return Lockout::lockModel($this, $options);
+        return $this->resolveLockoutService()->lockModel($this, $options);
     }
 
     /**
@@ -122,6 +134,6 @@ trait HasLockout
      */
     public function unlock(array $options = []): ?ModelLockout
     {
-        return Lockout::unlockModel($this, $options);
+        return $this->resolveLockoutService()->unlockModel($this, $options);
     }
 }
