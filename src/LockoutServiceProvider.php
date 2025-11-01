@@ -2,6 +2,7 @@
 
 namespace Beliven\Lockout;
 
+use Beliven\Lockout\Commands\PruneLockouts;
 use Beliven\Lockout\Events\EntityLocked;
 use Beliven\Lockout\Listeners\MarkModelAsLocked;
 use Beliven\Lockout\Listeners\OnEntityLocked;
@@ -26,7 +27,8 @@ class LockoutServiceProvider extends PackageServiceProvider
             ->hasRoute('web')
             ->hasMigration('create_lockout_logs_table')
             ->hasMigration('create_model_lockouts_table')
-            ->hasTranslations();
+            ->hasTranslations()
+            ->hasCommand(PruneLockouts::class);
     }
 
     public function boot(): void

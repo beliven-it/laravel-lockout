@@ -3,7 +3,9 @@
 namespace Beliven\Lockout\Http\Middleware;
 
 use Beliven\Lockout\Facades\Lockout;
+use Beliven\Lockout\Models\ModelLockout;
 use Closure;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -19,7 +21,10 @@ class EnsureUserIsNotLocked
 
         // If a model exists for the identifier and it has an active persistent lock,
         // short-circuit with a 429 response.
-        $model = Lockout::getLoginModel($identifier);
+        $model = ModelLockout::active()
+            ->where('identifier', $identifier)
+            ->first()?->model;
+
         if ($model && $this->modelHasActiveLock($model)) {
             return $this->lockedResponse();
         }
@@ -37,7 +42,7 @@ class EnsureUserIsNotLocked
      *
      * Returns true if an active lock exists, false otherwise.
      */
-    protected function modelHasActiveLock($model): bool
+    protected function modelHasActiveLock(Model $model): bool
     {
         // Prefer model-provided helper if available.
         if (method_exists($model, 'activeLock')) {
@@ -73,7 +78,7 @@ class EnsureUserIsNotLocked
     protected function lockedResponse(): JsonResponse
     {
         return response()->json([
-            'message' => trans('laravel-lockout::translations.middleware.account_locked'),
+            'message' => trans('lockout::lockout.middleware.account_locked'),
         ], Response::HTTP_TOO_MANY_REQUESTS);
     }
 }

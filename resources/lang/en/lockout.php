@@ -25,4 +25,7 @@ return [
             'footer'  => 'If you did not attempt to log in, please contact support immediately.',
         ],
     ],
+    'middleware' => [
+        'account_locked' => 'Your account is currently locked due to multiple failed login attempts.',
+    ],
 ];

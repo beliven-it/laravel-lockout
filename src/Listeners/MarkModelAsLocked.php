@@ -4,6 +4,7 @@ namespace Beliven\Lockout\Listeners;
 
 use Beliven\Lockout\Events\EntityLocked;
 use Beliven\Lockout\Lockout as LockoutService;
+use Beliven\Lockout\Models\ModelLockout;
 use Throwable;
 
 class MarkModelAsLocked
@@ -20,7 +21,9 @@ class MarkModelAsLocked
 
             // Resolve the Lockout service and model for the identifier.
             $lockout = app(LockoutService::class);
-            $model = $lockout->getLoginModel($identifier);
+            $model = ModelLockout::active()
+                ->where('identifier', $identifier)
+                ->first()?->model;
 
             if (!$model) {
                 return;
@@ -38,11 +41,38 @@ class MarkModelAsLocked
             }
 
             // Otherwise, attempt to create a lock record via the model's relation.
+            // Avoid creating duplicate active lock records by checking for an existing active lock
+            // before creating a new one.
             if (method_exists($model, 'lockouts')) {
                 try {
-                    $model->lockouts()->create([
-                        'locked_at' => now(),
-                    ]);
+                    $hasActive = false;
+
+                    // Prefer model-provided activeLock() helper if available.
+                    if (method_exists($model, 'activeLock')) {
+                        try {
+                            $hasActive = (bool) $model->activeLock();
+                        } catch (Throwable $_) {
+                            $hasActive = false;
+                        }
+                    } else {
+                        // Fallback: query the relation for an active lock.
+                        try {
+                            $hasActive = (bool) $model->lockouts()
+                                ->whereNull('unlocked_at')
+                                ->where(function ($q) {
+                                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                                })
+                                ->exists();
+                        } catch (Throwable $_) {
+                            $hasActive = false;
+                        }
+                    }
+
+                    if (!$hasActive) {
+                        $model->lockouts()->create([
+                            'locked_at' => now(),
+                        ]);
+                    }
                 } catch (Throwable $_) {
                     // Relation-based creation failed; swallow to keep flow resilient.
                 }

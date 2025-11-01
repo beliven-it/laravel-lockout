@@ -4,6 +4,7 @@ namespace Beliven\Lockout;
 
 use Beliven\Lockout\Events\EntityLocked;
 use Beliven\Lockout\Models\LockoutLog;
+use Beliven\Lockout\Models\ModelLockout;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
@@ -98,7 +99,10 @@ class Lockout
 
         $notification = new $notificationClass($id, $this->decayMinutes, $signedUnlockUrl);
 
-        $model = $this->getLoginModel($id);
+        $model = ModelLockout::active()
+            ->where('identifier', $id)
+            ->first()?->model;
+
         if (!$model) {
             return;
         }
@@ -115,23 +119,24 @@ class Lockout
         return config('lockout.login_field', 'email');
     }
 
-    public function getLoginModelClass(): string
-    {
-        $loginField = $this->getLoginField();
-
-        return config('auth.providers.users.model');
-    }
-
-    public function getLoginModel(string $identifier): ?Model
-    {
-        $modelClass = $this->getLoginModelClass();
-
-        return $modelClass::where($this->getLoginField(), $identifier)->first();
-    }
-
     protected function throttleKey(string $id): string
     {
         return 'login-attempts:' . $id;
+    }
+
+    /**
+     * Clear stored attempt counter for an identifier.
+     *
+     * This is used when a model is unlocked so that the in-memory / cache
+     * counter is cleared and the normal flow (allowing login attempts again)
+     * works as expected.
+     *
+     * Example usage from ModelLockout::markUnlocked():
+     *   \Beliven\Lockout\Facades\Lockout::clearAttempts($identifier);
+     */
+    public function clearAttempts(string $id): void
+    {
+        Cache::store($this->cacheStore)->forget($this->throttleKey($id));
     }
 
     protected function createLog(string $id, object $data): void
@@ -142,80 +147,6 @@ class Lockout
         $logModel->ip_address = $data->ip ?? null;
         $logModel->user_agent = $data->user_agent ?? null;
         $logModel->attempted_at = now();
-
-        // Attempt to associate the log entry with the concrete Eloquent model
-        // (if a model exists for the given identifier). The migration provides a
-        // nullable morph column named `model` so we associate via that morph.
-        try {
-            $relatedModel = $this->getLoginModel($id);
-            if ($relatedModel) {
-                // Use morph association if available on the log model.
-                // The LockoutLog model exposes a morph relation `model()`.
-                if (method_exists($logModel, 'model')) {
-                    $logModel->model()->associate($relatedModel);
-                } else {
-                    // Fallback: set morph type/id directly if relation method is absent.
-                    $logModel->setAttribute('model_type', get_class($relatedModel));
-                    $logModel->setAttribute('model_id', $relatedModel->getKey());
-                }
-
-                // If the attempt caused the identifier to be considered blocked (i.e. threshold reached)
-                // and there is no active lock recorded for the model yet, create a model lock record.
-                // This ensures the package records a persistent lock in the dedicated `model_lockouts`
-                // table when appropriate.
-                try {
-                    if ($this->hasTooManyAttempts($id)) {
-                        $hasActive = false;
-
-                        // Prefer model-provided activeLock() helper if available.
-                        if (method_exists($relatedModel, 'activeLock')) {
-                            try {
-                                $hasActive = (bool) $relatedModel->activeLock();
-                            } catch (\Throwable $_) {
-                                $hasActive = false;
-                            }
-                        } elseif (method_exists($relatedModel, 'lockouts')) {
-                            // Fallback: query the relation for an active lock.
-                            try {
-                                $hasActive = (bool) $relatedModel->lockouts()
-                                    ->whereNull('unlocked_at')
-                                    ->where(function ($q) {
-                                        $q->whereNull('expires_at')
-                                            ->orWhere('expires_at', '>', now());
-                                    })
-                                    ->exists();
-                            } catch (\Throwable $_) {
-                                $hasActive = false;
-                            }
-                        }
-
-                        // If no active lock exists, create one. Prefer calling the model's
-                        // `lock()` method when available so model-specific logic executes.
-                        if (!$hasActive) {
-                            if (method_exists($relatedModel, 'lock')) {
-                                try {
-                                    $relatedModel->lock();
-                                } catch (\Throwable $_) {
-                                    // swallow and continue; lock creation is best-effort here
-                                }
-                            } elseif (method_exists($relatedModel, 'lockouts')) {
-                                try {
-                                    $relatedModel->lockouts()->create([
-                                        'locked_at' => now(),
-                                    ]);
-                                } catch (\Throwable $_) {
-                                    // swallow and continue
-                                }
-                            }
-                        }
-                    }
-                } catch (\Throwable $_) {
-                    // Ignore any errors when attempting to inspect/create lock records.
-                }
-            }
-        } catch (\Throwable $e) {
-            // If association fails for any reason, ignore and still persist the log.
-        }
 
         $logModel->save();
     }

@@ -13,8 +13,6 @@ use Illuminate\Support\Facades\Facade;
  * @method static bool attemptLockout(string $id, object $data)
  * @method static void attemptSendLockoutNotification(string $id, object $data)
  * @method static string getLoginField()
- * @method static string getLoginModelClass()
- * @method static \Illuminate\Database\Eloquent\Model|null getLoginModel(string $identifier)
  */
 class Lockout extends Facade
 {

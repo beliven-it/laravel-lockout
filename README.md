@@ -124,6 +124,51 @@ Defaults are safe for most apps; override env values to customize.
 - The link routes to an unlock controller that clears the model's active lock record in the `model_lockouts` table.
 - The unlock flow uses a temporary signed route and validates the signature.
 
+## Pruning & retention
+
+The package records both short-term throttling state (cache-based counters) and persistent records (`model_lockouts` and `lockout_logs`). Keeping a history of lock events is useful for auditing and security analysis, but historic data can accumulate over time. The package provides a configurable pruning facility to remove old records.
+
+Configuration
+- `config/lockout.php` exposes a `prune` section (enabled by default) with:
+  - `prune.enabled` (bool) — enable/disable pruning
+  - `prune.lockout_logs_days` (int) — days to retain `lockout_logs` (default: 90)
+  - `prune.model_lockouts_days` (int) — days to retain `model_lockouts` history (default: 365)
+
+Artisan command
+- Use the included command to prune old records:
+
+  - `php artisan lockout:prune`  
+    Runs pruning for both `lockout_logs` and `model_lockouts` using configured retention days. By default the command asks for confirmation.
+
+  - Useful options:
+    - `--days-logs=NN` — override days for `lockout_logs`
+    - `--days-models=NN` — override days for `model_lockouts`
+    - `--only-logs` / `--only-model` — prune only one table
+    - `--force` — run without confirmation (suitable for scheduler)
+
+Behavior
+- `lockout_logs` pruning removes log entries older than the configured cutoff (based on the `attempted_at` timestamp).
+- `model_lockouts` pruning removes unlocked historical lock records only (records where `unlocked_at` is not null and older than the configured cutoff). Active locks are never automatically pruned by this command.
+
+Database-level protection (recommended)
+- To avoid duplicate *active* locks in concurrent environments, consider adding a database-level guarantee where supported:
+  - On PostgreSQL you can create a partial unique index to prevent more than one active lock per model:
+    ```sql
+    CREATE UNIQUE INDEX uq_model_lockouts_active ON model_lockouts (model_type, model_id) WHERE unlocked_at IS NULL;
+    ```
+  - The package includes an optional migration stub demonstrating this approach; adapt it to your environment (note: `CONCURRENTLY` index creation on Postgres must be handled specially outside transactions for zero-downtime index builds).
+- Even with DB protection, the package uses a transaction + `lockForUpdate()` when creating a new persistent lock to minimize race conditions.
+
+Scheduling
+- It's recommended to run the prune command regularly (e.g. nightly) via Laravel's scheduler:
+  ```php
+  $schedule->command('lockout:prune --force')->daily();
+  ```
+
+Notes
+- Pruning is best-effort and configurable; keep audit requirements in mind when choosing retention durations.
+- If you prefer a lighter approach (no history), you can configure the application to delete lock records on unlock — but consider keeping `lockout_logs` for auditing.
+
 ---
 
 ## Events & extension points
