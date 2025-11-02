@@ -5,10 +5,12 @@
 <br>
     
 <p align="center">
+
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/beliven-it/laravel-lockout.svg?style=for-the-badge&labelColor=2a2c2e&color=0fbccd)](https://packagist.org/packages/beliven-it/laravel-lockout)
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/beliven-it/laravel-lockout/run-tests.yml?branch=main&label=tests&style=for-the-badge&labelColor=2a2c2e&color=0fbccd)](https://github.com/beliven-it/laravel-lockout/actions?query=workflow%3Arun-tests+branch%3Amain)
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/beliven-it/laravel-lockout/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=for-the-badge&labelColor=2a2c2e&color=0fbccd)](https://github.com/beliven-it/laravel-lockout/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/beliven-it/laravel-lockout.svg?style=for-the-badge&labelColor=2a2c2e&color=0fbccd)](https://packagist.org/packages/beliven-it/laravel-lockout)
+
 </p>
 
 A small, opinionated Laravel package that locks accounts after repeated failed login attempts. It provides both in-memory throttling (cache counters) and optional persistent locks stored in the database, plus unlock notifications via a temporary signed link.
@@ -59,6 +61,31 @@ Route::post('/login', [LoginController::class, 'login'])
 - Attempt failing logins for the same identifier until the threshold is reached.
 - Inspect the `lockout_logs` table and (if configured) `model_lockouts` for persistent locks.
 - If `unlock_via_notification` is enabled, the package will try to send a temporary signed unlock link to a notifiable model.
+
+Scheduler (recommended)
+- The package includes a console command `lockout:prune` to remove old records according to the retention values in `config('lockout.prune')` (`prune.lockout_logs_days` and `prune.model_lockouts_days`). In production you should schedule this command to run regularly via Laravel's scheduler (and ensure your cron runs `schedule:run`).
+
+Example: register scheduled tasks in `routes/console.php`
+
+```php
+<?php
+//....
+// routes/console.php
+
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('lockout:prune --force')->dailyAt('02:00')->withoutOverlapping();
+
+// Optional: separate schedules for logs/models, or different cadences.
+Schedule::command('lockout:prune --only-logs --force')->dailyAt('03:00')->withoutOverlapping();
+Schedule::command('lockout:prune --only-model --force')->weekly()->withoutOverlapping();
+
+```
+
+
+Tips
+- You can override the retention periods at runtime by passing `--days-logs` and/or `--days-models` to the command, e.g. `php artisan lockout:prune --days-logs=30 --days-models=180 --force`.
+- Ensure `lockout.prune.enabled` in your config is `true` (default) for the scheduled prune to actually perform deletions.
 
 ---
 
