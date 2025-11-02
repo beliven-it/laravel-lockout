@@ -56,13 +56,7 @@ Route::post('/login', [LoginController::class, 'login'])
     ->middleware(EnsureUserIsNotLocked::class);
 ```
 
-5. Test manually:
-
-- Attempt failing logins for the same identifier until the threshold is reached.
-- Inspect the `lockout_logs` table and (if configured) `model_lockouts` for persistent locks.
-- If `unlock_via_notification` is enabled, the package will try to send a temporary signed unlock link to a notifiable model.
-
-Scheduler (recommended)
+5. Scheduler (recommended)
 - The package includes a console command `lockout:prune` to remove old records according to the retention values in `config('lockout.prune')` (`prune.lockout_logs_days` and `prune.model_lockouts_days`). In production you should schedule this command to run regularly via Laravel's scheduler (and ensure your cron runs `schedule:run`).
 
 Example: register scheduled tasks in `routes/console.php`
@@ -86,6 +80,12 @@ Schedule::command('lockout:prune --only-model --force')->weekly()->withoutOverla
 Tips
 - You can override the retention periods at runtime by passing `--days-logs` and/or `--days-models` to the command, e.g. `php artisan lockout:prune --days-logs=30 --days-models=180 --force`.
 - Ensure `lockout.prune.enabled` in your config is `true` (default) for the scheduled prune to actually perform deletions.
+
+6. Test manually:
+
+- Attempt failing logins for the same identifier until the threshold is reached.
+- Inspect the `lockout_logs` table and (if configured) `model_lockouts` for persistent locks.
+- If `unlock_via_notification` is enabled, the package will try to send a temporary signed unlock link to a notifiable model.
 
 ---
 
