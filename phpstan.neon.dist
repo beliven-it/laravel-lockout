@@ -24,9 +24,7 @@ parameters:
         - message: "#Trait .* is used zero times and is not analysed#"
           paths:
               - src/Traits/HasLockout.php
-        - message: "#Access to an undefined property Beliven\\\\Lockout\\\\Models\\\\LockoutLog::\\$#"
-          paths:
-              - src/Lockout.php
+
         - message: "#Call to function is_array\\(\\) with array will always evaluate to true#"
           paths:
               - src/Listeners/RecordFailedLoginAttempt.php

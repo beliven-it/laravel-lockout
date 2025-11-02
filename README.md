@@ -2,19 +2,16 @@
 
 <p align="center"><img src="./repo/banner.png" alt="Laravel Lockout banner" /></p>
 
+<br>
+    
+<p align="center">
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/beliven-it/laravel-lockout.svg?style=for-the-badge&labelColor=2a2c2e&color=0fbccd)](https://packagist.org/packages/beliven-it/laravel-lockout)
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/beliven-it/laravel-lockout/run-tests.yml?branch=main&label=tests&style=for-the-badge&labelColor=2a2c2e&color=0fbccd)](https://github.com/beliven-it/laravel-lockout/actions?query=workflow%3Arun-tests+branch%3Amain)
+[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/beliven-it/laravel-lockout/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=for-the-badge&labelColor=2a2c2e&color=0fbccd)](https://github.com/beliven-it/laravel-lockout/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/beliven-it/laravel-lockout.svg?style=for-the-badge&labelColor=2a2c2e&color=0fbccd)](https://packagist.org/packages/beliven-it/laravel-lockout)
+</p>
 
 A small, opinionated Laravel package that locks accounts after repeated failed login attempts. It provides both in-memory throttling (cache counters) and optional persistent locks stored in the database, plus unlock notifications via a temporary signed link.
-
-This README now contains:
-- Quick Start (usage)
-- Configuration highlights
-- API Reference (facade/service)
-- Customization examples
-- Troubleshooting & testing tips
-- Developing (how to run tests, coverage, and contribute)
 
 ---
 
@@ -36,12 +33,13 @@ php artisan vendor:publish --tag="lockout-migrations"
 php artisan migrate
 ```
 
-3. Add the trait to your authentication model (e.g. `App\Models\User`):
+3. Add the trait to your authentication model (e.g. `App\Models\User`) and implement the `LockableModel` contract:
 
 ```php
 use Beliven\Lockout\Traits\HasLockout;
+use Beliven\Lockout\Contracts\LockableModel;
 
-class User extends Authenticatable
+class User extends Authenticatable implements LockableModel
 {
     use HasLockout;
 }
