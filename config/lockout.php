@@ -58,6 +58,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Unlock redirect route
+    |--------------------------------------------------------------------------
+    |
+    | 'unlock_redirect_route' (string)
+    | Env: LOCKOUT_UNLOCK_REDIRECT_ROUTE
+    | Default: 'login'
+    |
+    | The named route used to redirect users after a successful unlock action
+    | or when the package cannot resolve a model for the provided identifier.
+    | This defaults to the common 'login' route but can be overridden to any
+    | named route in the host application.
+    |
+    */
+    'unlock_redirect_route' => env('LOCKOUT_UNLOCK_REDIRECT_ROUTE', 'login'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Notification class
     |--------------------------------------------------------------------------
     |

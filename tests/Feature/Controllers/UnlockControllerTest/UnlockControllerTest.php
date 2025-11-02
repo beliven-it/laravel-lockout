@@ -166,6 +166,50 @@ describe('UnlockController and EnsureUserIsNotLocked middleware', function () {
         expect($active)->toBeNull();
     });
 
+    it('uses configured unlock_redirect_route for redirects', function () {
+        // Override config to use a custom named route
+        config()->set('lockout.unlock_redirect_route', 'custom.login');
+
+        // Provide the custom named route used by the controller redirect
+        Route::get('/custom-login', fn () => 'custom-login')->name('custom.login');
+
+        // Seed a locked user
+        $user = User::query()->create([
+            'email'    => 'custom-redirect@example.test',
+            'password' => Hash::make('secret'),
+        ]);
+
+        // Create active lock record
+        DB::table('model_lockouts')->insert([
+            'model_type' => \Beliven\Lockout\Tests\Fixtures\User::class,
+            'model_id'   => $user->id,
+            'locked_at'  => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Generate a temporary signed URL for the named route
+        $signedUrl = URL::temporarySignedRoute('lockout.unlock', now()->addDay(), [
+            'identifier' => $user->email,
+        ]);
+
+        // Perform a GET request against the signed URL so the 'signed' middleware runs
+        $response = $this->get($signedUrl);
+
+        // Should redirect (302) to the configured route name
+        $response->assertStatus(302);
+        $response->assertRedirect(route('custom.login'));
+
+        // Ensure the user's active lock has been cleared
+        $user->refresh();
+        $active = DB::table('model_lockouts')
+            ->where('model_type', \Beliven\Lockout\Tests\Fixtures\User::class)
+            ->where('model_id', $user->id)
+            ->whereNull('unlocked_at')
+            ->first();
+        expect($active)->toBeNull();
+    });
+
     it('rejects unlock request with invalid signature', function () {
         // Seed a locked user
         $user = User::query()->create([

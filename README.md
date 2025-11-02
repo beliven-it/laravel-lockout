@@ -103,6 +103,7 @@ return [
     'decay_minutes' => 30,
     'cache_store' => 'database',
     'auto_unlock_hours' => 0,
+    'unlock_redirect_route' => 'login',
     'unlock_link_minutes' => 1440,
     'prune' => [
         'enabled' => true,
