@@ -133,7 +133,7 @@ class Lockout
         return $modelClass::where($this->getLoginField(), $identifier)->first();
     }
 
-    public function lockModel(Model $model, array $options = []): ?ModelLockout
+    public function lockModel(Model $model, ?array $options = []): ?ModelLockout
     {
         $attributes = [
             'locked_at'  => $options['locked_at'] ?? now(),
@@ -151,7 +151,7 @@ class Lockout
         }
     }
 
-    public function unlockModel(Model $model, array $options = []): ?ModelLockout
+    public function unlockModel(Model $model, ?array $options = []): ?ModelLockout
     {
         $lock = $model->activeLock();
         if (!$lock) {

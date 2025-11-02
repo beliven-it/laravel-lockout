@@ -44,6 +44,8 @@ describe('UnlockController (unit)', function () {
         // listener and other code resolve the service via the container.
         $mockService = Mockery::mock(\Beliven\Lockout\Lockout::class);
         $mockService->shouldReceive('getLoginModel')->once()->with($identifier)->andReturn($model);
+        // Expect the service to be asked to perform the unlock on the resolved model.
+        $mockService->shouldReceive('unlockModel')->once()->with($model)->andReturn(null);
         app()->instance(\Beliven\Lockout\Lockout::class, $mockService);
 
         $request = Request::create('/lockout/unlock', 'GET', ['identifier' => $identifier]);
@@ -56,8 +58,8 @@ describe('UnlockController (unit)', function () {
         expect(method_exists($response, 'getStatusCode'))->toBeTrue();
         expect($response->getStatusCode())->toBe(302);
 
-        // Model's unlockAccount should have been called
-        expect($model->unlocked)->toBeTrue();
+        // The unlock call is delegated to the Lockout service; mock expectations above verify it was invoked.
+        expect(true)->toBeTrue();
     });
 
     it('redirects to login with error when model is not found', function () {

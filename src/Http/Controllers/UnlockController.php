@@ -17,7 +17,7 @@ class UnlockController
             return $this->redirectWithError();
         }
 
-        $model->unlock();
+        Lockout::unlockModel($model);
 
         return redirect()->route('login')->with('status', __('Your account has been unlocked. You can now log in.'));
     }
