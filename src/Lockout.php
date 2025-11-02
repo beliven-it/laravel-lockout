@@ -9,7 +9,6 @@ use Beliven\Lockout\Models\ModelLockout;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
@@ -127,7 +126,7 @@ class Lockout
         return config('auth.providers.users.model');
     }
 
-    public function getLoginModel(string $identifier): ?LockableModel
+    public function getLoginModel(string $identifier): null|LockableModel|Model
     {
         $modelClass = $this->getLoginModelClass();
 

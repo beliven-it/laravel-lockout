@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static bool hasTooManyAttempts(string $id)
  * @method static bool attemptLockout(string $id, object $data)
  * @method static void attemptSendLockoutNotification(string $id, object $data)
- * @method static \Beliven\Lockout\Contracts\LockableModel|null getLoginModel(string $identifier)
+ * @method static \Beliven\Lockout\Contracts\LockableModel|\Illuminate\Database\Eloquent\Model|null getLoginModel(string $identifier)
  * @method static void clearAttempts(string $id)
  * @method static null|\Beliven\Lockout\Models\ModelLockout unlockModel(\Beliven\Lockout\Contracts\LockableModel $model, ?array $options = [])
  * @method static null|\Beliven\Lockout\Models\ModelLockout lockModel(\Beliven\Lockout\Contracts\LockableModel $model, ?array $options = [])

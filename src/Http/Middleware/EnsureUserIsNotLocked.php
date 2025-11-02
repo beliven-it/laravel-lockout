@@ -41,7 +41,7 @@ class EnsureUserIsNotLocked
      *
      * Returns true if an active lock exists, false otherwise.
      */
-    protected function modelHasActiveLock(LockableModel $model): bool
+    protected function modelHasActiveLock(Model|LockableModel $model): bool
     {
         // Prefer model-provided helper if available.
         try {
