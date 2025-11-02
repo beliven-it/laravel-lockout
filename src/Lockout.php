@@ -2,6 +2,7 @@
 
 namespace Beliven\Lockout;
 
+use Beliven\Lockout\Contracts\LockableModel;
 use Beliven\Lockout\Events\EntityLocked;
 use Beliven\Lockout\Models\LockoutLog;
 use Beliven\Lockout\Models\ModelLockout;
@@ -126,14 +127,14 @@ class Lockout
         return config('auth.providers.users.model');
     }
 
-    public function getLoginModel(string $identifier): ?Model
+    public function getLoginModel(string $identifier): ?LockableModel
     {
         $modelClass = $this->getLoginModelClass();
 
         return $modelClass::where($this->getLoginField(), $identifier)->first();
     }
 
-    public function lockModel(Model $model, ?array $options = []): ?ModelLockout
+    public function lockModel(LockableModel $model, ?array $options = []): ?ModelLockout
     {
         $attributes = [
             'locked_at'  => $options['locked_at'] ?? now(),
@@ -151,7 +152,7 @@ class Lockout
         }
     }
 
-    public function unlockModel(Model $model, ?array $options = []): ?ModelLockout
+    public function unlockModel(LockableModel $model, ?array $options = []): ?ModelLockout
     {
         $lock = $model->activeLock();
         if (!$lock) {

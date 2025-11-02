@@ -59,8 +59,11 @@ afterEach(function () {
 
 /**
  * A model whose `lockouts()->create()` throws to simulate relation creation failure.
+ *
+ * Use LockableModelStub to satisfy the LockableModel contract for static analysis
+ * and to avoid relying on full Eloquent behaviour in this unit test helper.
  */
-class RelationCreateThrowsModel extends Illuminate\Database\Eloquent\Model
+class RelationCreateThrowsModel extends \Beliven\Lockout\Tests\Support\LockableModelStub
 {
     public function lockouts()
     {
@@ -76,8 +79,11 @@ class RelationCreateThrowsModel extends Illuminate\Database\Eloquent\Model
 
 /**
  * A model with no active lock present.
+ *
+ * Use LockableModelStub to satisfy the LockableModel contract required by the service
+ * without depending on full Eloquent internals.
  */
-class NoActiveLockModel extends Illuminate\Database\Eloquent\Model
+class NoActiveLockModel extends \Beliven\Lockout\Tests\Support\LockableModelStub
 {
     public function activeLock()
     {
@@ -87,8 +93,10 @@ class NoActiveLockModel extends Illuminate\Database\Eloquent\Model
 
 /**
  * A model whose active lock object will throw when saved (to exercise save exception branch).
+ *
+ * Use the LockableModelStub so the class is recognized as lockable by the service.
  */
-class ActiveLockSaveThrowsModel extends Illuminate\Database\Eloquent\Model
+class ActiveLockSaveThrowsModel extends \Beliven\Lockout\Tests\Support\LockableModelStub
 {
     public function activeLock()
     {
@@ -105,8 +113,11 @@ class ActiveLockSaveThrowsModel extends Illuminate\Database\Eloquent\Model
 /**
  * A model resolved by Lockout::getLoginModel but without a `notify()` method.
  * The static where() returns a query-like object exposing first().
+ *
+ * This helper extends LockableModelStub so it satisfies the contract expected
+ * by the Lockout service while remaining lightweight for tests.
  */
-class ResolvedModelNoNotify extends Illuminate\Database\Eloquent\Model
+class ResolvedModelNoNotify extends \Beliven\Lockout\Tests\Support\LockableModelStub
 {
     public static function where($field, $value)
     {
@@ -267,7 +278,7 @@ describe('Lockout edge cases', function () {
         };
 
         // Create a simple model that exposes the configured login field and returns the lock from activeLock()
-        $model = new class extends \Illuminate\Database\Eloquent\Model
+        $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
         {
             public $email = 'joe@example.test';
 

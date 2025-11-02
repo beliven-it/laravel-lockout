@@ -53,7 +53,7 @@ it('unlockModel returns null when lock save() returns false and still calls clea
     };
 
     // Model that exposes configured login field and returns the bad lock
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         public $timestamps = false;
 
@@ -106,7 +106,7 @@ it('unlockModel swallows exceptions from event dispatch and still returns the lo
     };
 
     // Model that exposes configured login field and returns the good lock
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         public $timestamps = false;
 

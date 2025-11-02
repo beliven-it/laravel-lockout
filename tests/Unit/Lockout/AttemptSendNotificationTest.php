@@ -61,7 +61,7 @@ describe('Lockout::attemptSendLockoutNotification', function () {
                 public static function where($field, $value) {
                     return new class {
                         public function first() {
-                            return new class extends \Illuminate\Database\Eloquent\Model {
+                            return new class extends \Beliven\Lockout\Tests\Support\LockableModelStub {
                                 // intentionally omit notify() to simulate a non-notifiable model
                                 public $timestamps = false;
                             };

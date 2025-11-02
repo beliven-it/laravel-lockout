@@ -14,7 +14,7 @@ describe('MarkModelAsLocked listener', function () {
         $identifier = 'user-with-lock@example.test';
 
         // Create an Eloquent-like model that exposes a lock() method
-        $model = new class extends EloquentModel
+        $model = new class extends Beliven\Lockout\Tests\Support\LockableModelStub
         {
             public $locked = false;
 
@@ -24,7 +24,7 @@ describe('MarkModelAsLocked listener', function () {
 
             protected $guarded = [];
 
-            public function lock(): void
+            public function lock(array $options = []): void
             {
                 $this->locked = true;
             }
@@ -114,7 +114,7 @@ describe('MarkModelAsLocked listener', function () {
         config()->set('lockout.auto_unlock_hours', 3);
 
         // Model that captures created attributes similarly to the previous test
-        $model = new class extends EloquentModel
+        $model = new class extends Beliven\Lockout\Tests\Support\LockableModelStub
         {
             public $locked = false;
 
@@ -126,7 +126,7 @@ describe('MarkModelAsLocked listener', function () {
 
             protected $guarded = [];
 
-            public function lock($options): void
+            public function lock(array $options = []): void
             {
                 $this->lastCreated = $options['expires_at'] ?? null;
                 $this->locked = true;

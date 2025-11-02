@@ -29,7 +29,7 @@ it('treats model->activeLock throwing as not locked and allows the request', fun
     $identifier = 'throwing-active@example.test';
 
     // Create a dummy model whose activeLock() throws an exception
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         // Keep Eloquent silent in tests (no timestamps required)
         public $timestamps = false;
@@ -68,7 +68,7 @@ it('treats relation query exceptions as not locked and allows the request', func
     $identifier = 'relation-throws@example.test';
 
     // Model without activeLock(), but with a lockouts() relation that throws during exists/query.
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         // Prevent Eloquent from requiring timestamps or DB for this dummy
         public $timestamps = false;
@@ -132,7 +132,7 @@ it('blocks the request when model.activeLock returns a lock (lockedResponse)', f
     $identifier = 'blocked-by-model@example.test';
 
     // Model whose activeLock() returns a non-null value (simulates an active lock)
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         // Keep Eloquent silent in tests (no timestamps required)
         public $timestamps = false;

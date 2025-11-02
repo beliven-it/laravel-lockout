@@ -2,6 +2,7 @@
 
 namespace Beliven\Lockout\Http\Middleware;
 
+use Beliven\Lockout\Contracts\LockableModel;
 use Beliven\Lockout\Facades\Lockout;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,7 @@ class EnsureUserIsNotLocked
         $identifier = $request->input(Lockout::getLoginField());
 
         if (is_null($identifier)) {
+
             return $next($request);
         }
 
@@ -39,34 +41,15 @@ class EnsureUserIsNotLocked
      *
      * Returns true if an active lock exists, false otherwise.
      */
-    protected function modelHasActiveLock(Model $model): bool
+    protected function modelHasActiveLock(LockableModel $model): bool
     {
         // Prefer model-provided helper if available.
-        if (method_exists($model, 'activeLock')) {
-            try {
-                return $model->activeLock() !== null;
-            } catch (\Throwable $e) {
-                // Ignore errors and treat as not locked to keep middleware resilient.
-                return false;
-            }
+        try {
+            return $model->activeLock() !== null;
+        } catch (\Throwable $e) {
+            // Ignore errors and treat as not locked to keep middleware resilient.
+            return false;
         }
-
-        // Fallback to querying the lockouts relation if present.
-        if (method_exists($model, 'lockouts')) {
-            try {
-                return (bool) $model->lockouts()
-                    ->whereNull('unlocked_at')
-                    ->where(function ($q) {
-                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-                    })
-                    ->exists();
-            } catch (\Throwable $e) {
-                // Ignore DB errors and treat as not locked.
-                return false;
-            }
-        }
-
-        return false;
     }
 
     /**

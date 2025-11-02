@@ -15,7 +15,7 @@ describe('UnlockController (unit)', function () {
         $identifier = 'unit-locked@example.test';
 
         // Create a simple Eloquent model that exposes unlock()
-        $model = new class extends \Illuminate\Database\Eloquent\Model
+        $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
         {
             public $locked_at;
 
@@ -25,7 +25,7 @@ describe('UnlockController (unit)', function () {
 
             public $timestamps = false;
 
-            public function unlock()
+            public function unlock(array $options = [])
             {
                 $this->unlocked = true;
             }

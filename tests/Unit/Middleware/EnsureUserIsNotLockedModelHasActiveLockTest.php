@@ -14,7 +14,7 @@ it('executes the closure branch inside modelHasActiveLock and treats model as no
     $identifier = 'closure-branch@example.test';
 
     // Model with a lockouts() relation that properly accepts a closure in where(...)
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         public $timestamps = false;
 
@@ -100,7 +100,7 @@ it('returns false (allows request) when resolved model has neither activeLock no
     $identifier = 'no-methods-branch@example.test';
 
     // Simple model that exposes no activeLock() or lockouts() methods
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         public $timestamps = false;
     };

@@ -20,7 +20,7 @@ it('MarkModelAsLocked early-returns when model hasActiveLock true', function () 
     $identifier = 'already-locked@example.test';
 
     // Model that exposes both hasActiveLock() and lock() but reports already locked.
-    $model = new class extends Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         public $timestamps = false;
 
@@ -75,7 +75,7 @@ it('Lockout::unlockModel returns lock even when clearAttempts throws', function 
     $service = app(Lockout::class);
 
     // Prepare a model that has the configured login field value
-    $model = new class extends Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         public $timestamps = false;
 
@@ -99,7 +99,7 @@ it('Lockout::unlockModel returns lock even when clearAttempts throws', function 
     };
 
     // Model should return the active lock when activeLock() is called
-    $modelWithActive = new class($lock) extends Illuminate\Database\Eloquent\Model
+    $modelWithActive = new class($lock) extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         public $timestamps = false;
 
@@ -130,7 +130,7 @@ it('Lockout::unlockModel returns lock even when clearAttempts throws', function 
  */
 it('HasLockout relations return MorphMany', function () {
     // Anonymous model using the trait
-    $model = new class extends Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         use HasLockout;
 

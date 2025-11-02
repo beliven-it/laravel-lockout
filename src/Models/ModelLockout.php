@@ -83,7 +83,7 @@ class ModelLockout extends Model
         }
 
         // Otherwise active only if expires_at is in the future
-        return $this->expires_at && $this->expires_at->isFuture();
+        return $this->expires_at->isFuture();
     }
 
     /**
@@ -140,8 +140,6 @@ class ModelLockout extends Model
      *
      * This is useful when using the relation (e.g. $model->lockouts()->create(...))
      * but kept here for symmetry and tests.
-     *
-     * @return static
      */
     public static function createActive(array $attributes = []): self
     {

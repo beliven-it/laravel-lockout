@@ -12,7 +12,7 @@ it('allows the request when model has a lockouts relation and no active locks ex
     $identifier = 'no-active-locks@example.test';
 
     // Model with a lockouts() relation that simulates query builder and returns exists() => false
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         public $timestamps = false;
 
@@ -75,9 +75,14 @@ it('blocks the request when model has a lockouts relation that reports an active
     $identifier = 'active-locks@example.test';
 
     // Model with a lockouts() relation that simulates query builder and returns exists() => true
-    $model = new class extends \Illuminate\Database\Eloquent\Model
+    $model = new class extends \Beliven\Lockout\Tests\Support\LockableModelStub
     {
         public $timestamps = false;
+
+        public function activeLock()
+        {
+            return new class {};
+        }
 
         public function lockouts()
         {
@@ -103,6 +108,7 @@ it('blocks the request when model has a lockouts relation that reports an active
                     return true;
                 }
 
+                // allow the chained where(...) -> where(function...) pattern by returning self for orWhere etc.
                 public function orWhere($a = null, $b = null, $c = null)
                 {
                     return $this;

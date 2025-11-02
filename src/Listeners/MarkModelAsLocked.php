@@ -2,6 +2,7 @@
 
 namespace Beliven\Lockout\Listeners;
 
+use Beliven\Lockout\Contracts\LockableModel;
 use Beliven\Lockout\Events\EntityLocked;
 use Beliven\Lockout\Facades\Lockout;
 use Illuminate\Database\Eloquent\Model;
@@ -24,13 +25,6 @@ class MarkModelAsLocked
                 return;
             }
 
-            // Only proceed when the model exposes the HasLockout trait helpers.
-            // This keeps the listener simple: we rely on trait methods
-            // (`hasActiveLock()` and `lock()`) and avoid managing many cases.
-            if (!method_exists($model, 'hasActiveLock') || !method_exists($model, 'lock')) {
-                return;
-            }
-
             if ($model->hasActiveLock()) {
                 return;
             }
@@ -48,7 +42,7 @@ class MarkModelAsLocked
      *
      * Returns null on failure or if the model cannot be resolved.
      */
-    protected function resolveModel(mixed $identifier): ?Model
+    protected function resolveModel(mixed $identifier): ?LockableModel
     {
         try {
             return Lockout::getLoginModel($identifier);
