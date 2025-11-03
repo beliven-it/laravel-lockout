@@ -19,7 +19,7 @@ class UnlockController
 
         Lockout::unlockModel($model);
 
-        return redirect()->route(config('lockout.unlock_redirect_route', 'login'))->with('status', __('Your account has been unlocked. You can now log in.'));
+        return redirect()->route(config('lockout.unlock_redirect_route', 'login'))->with('status', trans('lockout::lockout.controller.account_unlocked'));
     }
 
     /**
@@ -35,6 +35,6 @@ class UnlockController
      */
     protected function redirectWithError(): RedirectResponse
     {
-        return redirect()->route(config('lockout.unlock_redirect_route', 'login'))->withErrors(__('Account not found.'));
+        return redirect()->route(config('lockout.unlock_redirect_route', 'login'))->withErrors(trans('lockout::lockout.controller.model_not_found'));
     }
 }

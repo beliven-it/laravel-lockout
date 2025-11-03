@@ -28,4 +28,8 @@ return [
     'middleware' => [
         'account_locked' => 'Your account is currently locked due to multiple failed login attempts.',
     ],
+    'controller' => [
+        'account_unlocked' => 'Your account has been unlocked. You can now log in.',
+        'model_not_found'  => 'Account not found.',
+    ],
 ];
