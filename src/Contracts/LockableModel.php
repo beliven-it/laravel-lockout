@@ -68,4 +68,12 @@ interface LockableModel
      * @param  array<string,mixed>  $options
      */
     public function unlock(array $options = []);
+
+    /**
+     * Force logout of the model when locked out.
+     *
+     * Optionally accepts the guard name used for authentication so implementers
+     * can perform guard-specific logout/revocation logic (for example 'web' or 'api').
+     */
+    public function logoutOnLockout(?string $guard = null): bool;
 }

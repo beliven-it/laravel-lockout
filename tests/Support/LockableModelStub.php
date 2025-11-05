@@ -22,8 +22,10 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  *   defaults (null/false) or throw `BadMethodCallException` where appropriate
  *   to signal the test should provide an override if real behaviour is needed.
  */
-class LockableModelStub extends Model implements LockableModel
+class LockableModelStub extends Model implements \Illuminate\Contracts\Auth\Authenticatable, LockableModel
 {
+    use \Illuminate\Auth\Authenticatable;
+
     /**
      * By default test stub does not provide a real MorphMany relation.
      * Override this in tests if you need relation-like behaviour.
@@ -100,5 +102,17 @@ class LockableModelStub extends Model implements LockableModel
     public function unlock(array $options = [])
     {
         return null;
+    }
+
+    /**
+     * Default test stub implementation for logoutOnLockout.
+     *
+     * Tests can override this method if they need to assert side-effects or
+     * perform guard-specific revocation (for example revoking API tokens).
+     */
+    public function logoutOnLockout(?string $guard = null): bool
+    {
+        // Default behaviour in tests: do not manipulate session/auth, just report handled.
+        return true;
     }
 }

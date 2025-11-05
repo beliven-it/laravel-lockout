@@ -4,6 +4,7 @@ namespace Beliven\Lockout\Traits;
 
 use Beliven\Lockout\Models\ModelLockout;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Trait HasLockout
@@ -135,5 +136,16 @@ trait HasLockout
     public function unlock(array $options = []): ?ModelLockout
     {
         return $this->resolveLockoutService()->unlockModel($this, $options);
+    }
+
+    public function logoutOnLockout(?string $guard = null): bool
+    {
+        // Default common case behavior
+        // (to be overridden in concrete models if needed)
+        Auth::guard($guard)->logout();
+        session()->invalidate();
+        session()->regenerateToken();
+
+        return true;
     }
 }

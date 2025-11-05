@@ -56,6 +56,16 @@ Route::post('/login', [LoginController::class, 'login'])
     ->middleware(EnsureUserIsNotLocked::class);
 ```
 
+The package also expose an additional middleware for ensure that locked users cannot access to any routes:
+
+```php
+use Beliven\Lockout\Http\Middleware\EnsureUserCannotAccessWhenLocked;
+
+Route::middleware([EnsureUserCannotAccessWhenLocked::class])->group(function () {
+    // protected routes for authenticated users
+});
+```
+
 5. Scheduler (recommended)
 - The package includes a console command `lockout:prune` to remove old records according to the retention values in `config('lockout.prune')` (`prune.lockout_logs_days` and `prune.model_lockouts_days`). In production you should schedule this command to run regularly via Laravel's scheduler (and ensure your cron runs `schedule:run`).
 
@@ -105,6 +115,7 @@ return [
     'auto_unlock_hours' => 0,
     'unlock_redirect_route' => 'login',
     'unlock_link_minutes' => 1440,
+    'logout_on_login' => false,
     'prune' => [
         'enabled' => true,
         'lockout_logs_days' => 90,
@@ -131,6 +142,35 @@ Route::get('/lockout/unlock', UnlockController::class)->name('lockout.unlock');
 ```
 
 The unlock link is temporary and validates the signature before performing the unlock action. The link lifetime is configurable via the `lockout.unlock_link_minutes` configuration key (default: 1440 minutes, i.e. 24 hours).
+
+--
+
+## Logout on Login
+
+If you want to ensure that when a locked user attempts to log in, any existing sessions are terminated, you can enable the `logout_on_login` configuration option. This is particularly useful in scenarios where you want to prevent locked users from maintaining active sessions.
+
+Also, is useful in scenario like third party admin panels (e.g. Filament, Nova) where you can't easily add the lockout middleware to the login route.
+
+You can enable this feature by setting the `logout_on_login` option to `true` in your `config/lockout.php` file:
+
+```php
+'logout_on_login' => true,
+```
+
+You can also override the `logoutAfterLogin` method on your model that uses the `HasLockout` trait to customize the logout behavior further. The default behavior is:
+
+```PHP
+public function logoutOnLockout(?string $guard = null): bool
+{
+    // Default common case behavior
+    // (to be overridden in concrete models if needed)
+    Auth::guard($guard)->logout();
+    session()->invalidate();
+    session()->regenerateToken();
+
+    return true;
+}
+```
 
 ---
 
@@ -226,6 +266,10 @@ vendor/bin/pest tests/Unit/SomeTest.php
 - `EntityUnlocked` — fired when a persistent lock is cleared. Useful to log unlocks or notify admins.
 
 Example listener registration is done via your `EventServiceProvider` if you need to override defaults.
+
+### Example. Prevent login on filament
+
+// todo
 
 ### Example: Laravel Nova Action
 
