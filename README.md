@@ -56,6 +56,16 @@ Route::post('/login', [LoginController::class, 'login'])
     ->middleware(EnsureUserIsNotLocked::class);
 ```
 
+The package also expose an additional middleware for ensure that locked users cannot access to any routes:
+
+```php
+use Beliven\Lockout\Http\Middleware\EnsureUserCannotAccessWhenLocked;
+
+Route::middleware([EnsureUserCannotAccessWhenLocked::class])->group(function () {
+    // protected routes for authenticated users
+});
+```
+
 5. Scheduler (recommended)
 - The package includes a console command `lockout:prune` to remove old records according to the retention values in `config('lockout.prune')` (`prune.lockout_logs_days` and `prune.model_lockouts_days`). In production you should schedule this command to run regularly via Laravel's scheduler (and ensure your cron runs `schedule:run`).
 
