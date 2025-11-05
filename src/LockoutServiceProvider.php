@@ -6,8 +6,10 @@ use Beliven\Lockout\Commands\PruneLockouts;
 use Beliven\Lockout\Events\EntityLocked;
 use Beliven\Lockout\Listeners\MarkModelAsLocked;
 use Beliven\Lockout\Listeners\OnEntityLocked;
+use Beliven\Lockout\Listeners\OnUserLogin;
 use Beliven\Lockout\Listeners\RecordFailedLoginAttempt;
 use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Event;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -37,6 +39,7 @@ class LockoutServiceProvider extends PackageServiceProvider
 
         // Register listeners for failed authentication attempts and lockout events.
         Event::listen(Failed::class, RecordFailedLoginAttempt::class);
+        Event::listen(Login::class, OnUserLogin::class);
 
         // When an entity is locked, mark the model as locked and handle notification.
         Event::listen(EntityLocked::class, MarkModelAsLocked::class);

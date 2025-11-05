@@ -188,6 +188,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Logout on login
+    |--------------------------------------------------------------------------
+    |
+    | 'logout_on_login' (bool)
+    | Env: LOCKOUT_LOGOUT_ON_LOGIN
+    | Default: false
+    |
+    | When true the package will listen for Laravel's `Illuminate\Auth\Events\Login`
+    | event and, if the authenticating model is currently locked, call the model
+    | hook `logoutOnLockout($guard)`. This provides a convenient automatic logout
+    | fallback for contexts where applying middleware is not possible (for
+    | example when a third-party library performs authentication outside of
+    | your HTTP middleware pipeline).
+    |
+    | Notes:
+    | - The package's default implementation (`HasLockout::logoutOnLockout`)
+    |   calls `Auth::guard($guard)->logout()`, invalidates the session and
+    |   regenerates the CSRF token. Override `logoutOnLockout(?string $guard = null)`
+    |   on your model to customize behavior (for example revoking API tokens).
+    | - This listener manipulates the session and authentication; avoid queueing
+    |   it because workers/background jobs do not have access to the HTTP session.
+    |   If you need background revocation, disable this option and provide a
+    |   queueable alternative or a custom listener that performs revocation safely.
+    | - To opt out and implement a custom logout/revocation flow, set this to
+    |   `false` and register your own listener for the `Login` event.
+    |
+    */
+    'logout_on_login' => env('LOCKOUT_LOGOUT_ON_LOGIN', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Pruning / Retention
     |--------------------------------------------------------------------------
     |

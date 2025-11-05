@@ -236,6 +236,7 @@ class Lockout
         // Attempt to associate the created log with the configured login model
         // (single-model strategy). Be defensive: swallow any errors so tests and
         // constrained environments without the users table do not fail.
+        /*
         try {
             $model = $this->getLoginModel($id);
             if ($model instanceof Model) {
@@ -244,6 +245,7 @@ class Lockout
         } catch (\Throwable $_) {
             // ignore association failures
         }
+        */
 
         $logModel->save();
     }
