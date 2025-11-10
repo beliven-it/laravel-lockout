@@ -14,12 +14,18 @@ class LockController
         $model = Lockout::getLoginModel($identifier);
 
         if (!$model) {
-            return $this->redirectWithError();
+            return $this->redirectWithError(trans('lockout::lockout.controller.model_not_found'));
         }
 
-        Lockout::lockModel($model);
+        try {
+            Lockout::lockModel($model);
 
-        return redirect()->route(config('lockout.lock_redirect_route', 'login'))->with('status', trans('lockout::lockout.controller.account_locked'));
+            Lockout::attemptSendLockoutNotification($identifier, (object) []);
+
+            return redirect()->route(config('lockout.lock_redirect_route', 'login'))->with('status', trans('lockout::lockout.controller.account_locked'));
+        } catch (\Exception $e) {
+            return $this->redirectWithError(trans('lockout::lockout.controller.general_error'));
+        }
     }
 
     /**
@@ -33,8 +39,8 @@ class LockController
     /**
      * Redirect to login with a user-friendly error when the model cannot be found.
      */
-    protected function redirectWithError(): RedirectResponse
+    protected function redirectWithError(string $error): RedirectResponse
     {
-        return redirect()->route(config('lockout.unlock_redirect_route', 'login'))->withErrors(trans('lockout::lockout.controller.model_not_found'));
+        return redirect()->route(config('lockout.lock_redirect_route', 'login'))->withErrors($error);
     }
 }

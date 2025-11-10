@@ -24,12 +24,21 @@ return [
             'action'  => 'Unlock account',
             'footer'  => 'If you did not attempt to log in, please contact support immediately.',
         ],
+        'account_logged' => [
+            'subject' => 'Successful Login Notification',
+            'line1'   => 'Your account with identifier :identifier has successfully logged in.',
+            'line2'   => 'If this was not you, please lock your account immediatly.',
+            'action'  => 'Lock account',
+            'footer'  => 'Thank you for using our application!',
+        ],
     ],
     'middleware' => [
         'account_locked' => 'Your account is currently locked due to multiple failed login attempts.',
     ],
     'controller' => [
         'account_unlocked' => 'Your account has been unlocked. You can now log in.',
+        'account_locked'   => 'Your account has been locked.',
         'model_not_found'  => 'Account not found.',
+        'general_error'    => 'An error occurred while processing your request. Please try again later.',
     ],
 ];

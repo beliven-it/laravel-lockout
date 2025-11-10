@@ -73,6 +73,7 @@ class Lockout
         $isBlockedNow = $this->hasTooManyAttempts($id);
 
         if ($isBlockedNow && !$wasBlocked) {
+            $model = $this->getLoginModel($id);
             Event::dispatch(new EntityLocked($id, $data));
         }
 
