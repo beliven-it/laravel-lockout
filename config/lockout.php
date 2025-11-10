@@ -42,6 +42,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Lock on login
+    |--------------------------------------------------------------------------
+    |
+    | 'unlock_via_notification' (bool)
+    | Env: LOCKOUT_LOCK_ON_LOGIN
+    | Default: true
+    |
+    | When true the package will attempt to send a notification when an
+    | account logged in. The notification include a way for lock the account
+    | (for instance a link or token). Set to false to disable any lock-related
+    |
+    */
+    'lock_on_login' => env('LOCKOUT_LOCK_ON_LOGIN', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Unlock link expiry (minutes)
     |--------------------------------------------------------------------------
     |
@@ -55,6 +71,22 @@ return [
     |
     */
     'unlock_link_minutes' => (int) env('LOCKOUT_UNLOCK_LINK_MINUTES', 1440),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lock link expiry (minutes)
+    |--------------------------------------------------------------------------
+    |
+    | 'lock_link_minutes' (int)
+    | Env: LOCKOUT_LOCK_LINK_MINUTES
+    | Default: 1440
+    |
+    | Duration, in minutes, for the temporary signed lock URL generated
+    | by the package. The default value of 1440 corresponds to 24 hours.
+    | Adjust this value to increase/decrease the signed URL lifetime.
+    |
+    */
+    'lock_link_minutes' => (int) env('LOCKOUT_LOCK_LINK_MINUTES', 1440),
 
     /*
     |--------------------------------------------------------------------------
@@ -72,6 +104,43 @@ return [
     |
     */
     'unlock_redirect_route' => env('LOCKOUT_UNLOCK_REDIRECT_ROUTE', 'login'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lock redirect route
+    |--------------------------------------------------------------------------
+    |
+    | 'lock_redirect_route' (string)
+    | Env: LOCKOUT_LOCK_REDIRECT_ROUTE
+    | Default: 'login'
+    |
+    | The named route used to redirect users after a successful lock action
+    | or when the package cannot resolve a model for the provided identifier.
+    | This defaults to the common 'login' route but can be overridden to any
+    | named route in the host application.
+    |
+    */
+    'lock_redirect_route' => env('LOCKOUT_LOCK_REDIRECT_ROUTE', 'login'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification class
+    |--------------------------------------------------------------------------
+    |
+    | 'login_notification_class' (string - FQCN)
+    | Env: LOCKOUT_LOGIN_NOTIFICATION_CLASS
+    | Default: \Beliven\Lockout\Notifications\AccountLogged::class
+    |
+    | The Login notification class instantiated to notify users on account logged in.
+    | Must extend Illuminate\Notifications\Notification and support the
+    | channels configured below. You can replace it with your own class
+    | to customize notification content or behavior.
+    |
+    */
+    'login_notification_class' => env(
+        'LOCKOUT_LOGIN_NOTIFICATION_CLASS',
+        \Beliven\Lockout\Notifications\AccountLogged::class
+    ),
 
     /*
     |--------------------------------------------------------------------------

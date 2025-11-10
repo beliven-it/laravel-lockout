@@ -22,12 +22,15 @@ class Lockout
 
     protected bool $unlockViaNotification;
 
+    protected bool $lockOnLogin;
+
     public function __construct()
     {
         $this->maxAttempts = config('lockout.max_attempts', 5);
         $this->decayMinutes = config('lockout.decay_minutes', 30);
         $this->cacheStore = config('lockout.cache_store', 'database');
         $this->unlockViaNotification = config('lockout.unlock_via_notification', true);
+        $this->lockOnLogin = config('lockout.lock_on_login', false);
     }
 
     public function getAttempts(string $id): int
@@ -74,6 +77,36 @@ class Lockout
         }
 
         return $isBlockedNow;
+    }
+
+    public function attemptSendLoginNotification(Model $model, object $data): void
+    {
+        if (!$this->lockOnLogin) {
+            return;
+        }
+
+        $id = $model->{$this->getLoginField()};
+        if (is_null($id)) {
+            return;
+        }
+
+        $notificationClass = config('lockout.login_notification_class', \Beliven\Lockout\Notifications\AccountLogged::class);
+        $lockoutDuration = $this->decayMinutes;
+
+        // Use configurable lifetime for the temporary signed unlock URL (minutes)
+        $minutes = (int) config('lockout.lock_link_minutes', 1440);
+        $signedUnlockUrl = URL::temporarySignedRoute('lockout.lock', now()->addMinutes($minutes), [
+            'identifier' => $id,
+            'entropy'    => Str::random(32),
+        ]);
+
+        $notification = new $notificationClass($id, $this->decayMinutes, $signedUnlockUrl);
+
+        if (!method_exists($model, 'notify')) {
+            return;
+        }
+
+        $model->notify($notification);
     }
 
     public function attemptSendLockoutNotification(string $id, object $data): void
