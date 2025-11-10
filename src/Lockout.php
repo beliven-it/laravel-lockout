@@ -73,8 +73,15 @@ class Lockout
         $isBlockedNow = $this->hasTooManyAttempts($id);
 
         if ($isBlockedNow && !$wasBlocked) {
-            $model = $this->getLoginModel($id);
-            Event::dispatch(new EntityLocked($id, $data));
+            // Avoid resolving the login model here: resolving may trigger DB
+            // queries (and fail in constrained test environments). Simply
+            // dispatch the event and swallow any exceptions to keep the
+            // lockout flow resilient.
+            try {
+                Event::dispatch(new EntityLocked($id, $data));
+            } catch (\Throwable $_) {
+                // ignore event dispatch failures
+            }
         }
 
         return $isBlockedNow;

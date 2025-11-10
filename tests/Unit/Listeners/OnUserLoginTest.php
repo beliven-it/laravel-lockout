@@ -322,4 +322,155 @@ describe('OnUserLogin listener', function () {
         expect($user->logoutCalled)->toBeTrue();
         expect($user->receivedGuard)->toBe('web');
     });
+
+    it('does nothing when configured login_field is missing on the model', function () {
+        // Enable login notification feature
+        config()->set('lockout.lock_on_login', true);
+        // Ensure default login field
+        config()->set('lockout.login_field', 'email');
+
+        // Create a model that intentionally lacks the configured identifier (no email)
+        $user = new class extends LockableModelStub implements \Illuminate\Contracts\Auth\Authenticatable
+        {
+            public $remember_token = null;
+
+            // Minimal Authenticatable implementation (no email property)
+            public function getAuthIdentifierName()
+            {
+                return 'id';
+            }
+
+            public function getAuthIdentifier()
+            {
+                return $this->id ?? 1;
+            }
+
+            public function getAuthPassword()
+            {
+                return '';
+            }
+
+            public function getRememberToken()
+            {
+                return $this->remember_token ?? null;
+            }
+
+            public function setRememberToken($value)
+            {
+                $this->remember_token = $value;
+            }
+
+            public function getRememberTokenName()
+            {
+                return 'remember_token';
+            }
+        };
+
+        $listener = new OnUserLogin;
+
+        // Provide an event that includes a guard name.
+        $event = new class($user, 'web') extends Login
+        {
+            /** @var \Illuminate\Contracts\Auth\Authenticatable */
+            public $user;
+
+            /** @var string|null */
+            public $guard;
+
+            public function __construct($user, $guard = null)
+            {
+                $this->user = $user;
+                $this->guard = $guard;
+            }
+        };
+
+        // Should not throw and should simply return early (no attempt to send notification).
+        try {
+            $listener->handle($event);
+            $reached = true;
+        } catch (\Throwable $e) {
+            $reached = false;
+        }
+
+        expect($reached)->toBeTrue();
+    });
+
+    it('delegates to Lockout::attemptSendLoginNotification with configured login_field', function () {
+        // Enable feature and set a custom login field
+        config()->set('lockout.lock_on_login', true);
+        config()->set('lockout.login_field', 'username');
+
+        // Create a model that exposes the custom login field
+        $user = new class extends LockableModelStub implements \Illuminate\Contracts\Auth\Authenticatable
+        {
+            public $username = 'alice';
+
+            public $remember_token = null;
+
+            public function getAuthIdentifierName()
+            {
+                return 'id';
+            }
+
+            public function getAuthIdentifier()
+            {
+                return $this->id ?? 1;
+            }
+
+            public function getAuthPassword()
+            {
+                return '';
+            }
+
+            public function getRememberToken()
+            {
+                return $this->remember_token ?? null;
+            }
+
+            public function setRememberToken($value)
+            {
+                $this->remember_token = $value;
+            }
+
+            public function getRememberTokenName()
+            {
+                return 'remember_token';
+            }
+        };
+
+        // Mock the Lockout service in the container so the facade resolves to it.
+        $mock = Mockery::mock(\Beliven\Lockout\Lockout::class);
+        // The listener calls Lockout::getLoginField() before delegating — ensure the mock responds.
+        $mock->shouldReceive('getLoginField')->andReturn('username');
+        $mock->shouldReceive('attemptSendLoginNotification')->once()->with(
+            Mockery::on(function ($arg) {
+                return is_object($arg) && isset($arg->username) && $arg->username === 'alice';
+            }),
+            Mockery::any()
+        );
+
+        app()->instance(\Beliven\Lockout\Lockout::class, $mock);
+
+        $listener = new OnUserLogin;
+
+        $event = new class($user, 'web') extends Login
+        {
+            /** @var \Illuminate\Contracts\Auth\Authenticatable */
+            public $user;
+
+            /** @var string|null */
+            public $guard;
+
+            public function __construct($user, $guard = null)
+            {
+                $this->user = $user;
+                $this->guard = $guard;
+            }
+        };
+
+        // Execute listener; mock expectations verify delegation occurred.
+        $listener->handle($event);
+
+        expect(true)->toBeTrue();
+    });
 });

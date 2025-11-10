@@ -15,8 +15,9 @@ class OnUserLogin
 
     protected function tryNotifyOnLogin(Login $event): void
     {
-        // PHPStan/Psalm type assertion:
-        /** @var \Beliven\Lockout\Contracts\LockableModel $user */
+        // PHPStan/Psalm type assertion: treat as Eloquent Model (and LockableModel) so
+        // static analysis understands this value can be passed to Lockout::attemptSendLoginNotification().
+        /** @var \Illuminate\Database\Eloquent\Model|\Beliven\Lockout\Contracts\LockableModel $user */
         $user = $event->user;
 
         // Get identifier
@@ -25,8 +26,8 @@ class OnUserLogin
             return;
         }
 
-        $identifier = (string) $user->{$identifierField};
-        Lockout::attemptSendLoginNotification($identifier, (object) []);
+        // Delegate to Lockout service using the resolved model instance
+        Lockout::attemptSendLoginNotification($user, (object) []);
     }
 
     protected function tryLogoutOnLogin(Login $event): void
@@ -39,7 +40,7 @@ class OnUserLogin
         }
 
         // PHPStan/Psalm type assertion:
-        /** @var \Beliven\Lockout\Contracts\LockableModel $user */
+        /** @var \Illuminate\Database\Eloquent\Model|\Beliven\Lockout\Contracts\LockableModel $user */
         $user = $event->user;
 
         if (!$user->isLockedOut()) {
