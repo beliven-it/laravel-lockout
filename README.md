@@ -109,6 +109,9 @@ return [
     'unlock_via_notification' => true,
     'notification_class' => \Beliven\Lockout\Notifications\AccountLocked::class,
     'notification_channels' => ['mail'],
+    'lock_on_login' => false,
+    'login_notification_class' => \Beliven\Lockout\Notifications\AccountLogged::class,
+    'lock_link_minutes' => 1440,
     'max_attempts' => 5,
     'decay_minutes' => 30,
     'cache_store' => 'database',
@@ -149,7 +152,7 @@ The unlock link is temporary and validates the signature before performing the u
 
 If you want to ensure that when a locked user attempts to log in, any existing sessions are terminated, you can enable the `logout_on_login` configuration option. This is particularly useful in scenarios where you want to prevent locked users from maintaining active sessions.
 
-Also, is useful in scenario like third party admin panels (e.g. Filament, Nova) where you can't easily add the lockout middleware to the login route.
+It is also useful in scenarios such as third-party admin panels (e.g. Filament, Nova) where you can't easily add the lockout middleware to the login route.
 
 You can enable this feature by setting the `logout_on_login` option to `true` in your `config/lockout.php` file:
 
@@ -157,9 +160,9 @@ You can enable this feature by setting the `logout_on_login` option to `true` in
 'logout_on_login' => true,
 ```
 
-You can also override the `logoutAfterLogin` method on your model that uses the `HasLockout` trait to customize the logout behavior further. The default behavior is:
+You can also override the `logoutOnLockout` method on your model that uses the `HasLockout` trait to customize the logout behavior further. The default behavior is:
 
-```PHP
+```php
 public function logoutOnLockout(?string $guard = null): bool
 {
     // Default common case behavior
@@ -171,6 +174,49 @@ public function logoutOnLockout(?string $guard = null): bool
     return true;
 }
 ```
+
+## Lock on Login
+
+This package optionally supports a "lock on login" flow that lets a user lock their own account immediately after a successful sign-in via a one-click, signed link sent to their email.
+
+How it works
+- When `lock_on_login` is enabled in the configuration, the package's `OnUserLogin` listener will attempt to send a login notification to the authenticating model after a successful login.
+- The notification contains a temporary, signed URL (route name `lockout.lock`) that, when clicked, will immediately create a persistent lock for that account.
+- The route that handles the link (`LockController`) will:
+  1. Resolve the login model for the supplied identifier.
+  2. Create a persistent lock for the model (via `lockModel` / the model's `lock()` helper).
+  3. Optionally send an unlock notification (if `unlock_via_notification` is enabled).
+  4. Redirect the user back to a configured route with a friendly status message.
+
+Enable the feature
+```php
+// config/lockout.php
+'lock_on_login' => true,
+```
+
+Important notes
+- The authenticatable model must be notifiable (i.e., implement `notify()` / use the `Notifiable` trait) for the package to send the login notification.
+- The notification class used for the login notification is configurable via `lockout.login_notification_class`. By default the package ships `\Beliven\Lockout\Notifications\AccountLogged`.
+- The temporary signed lock URL lifetime is controlled by `lockout.lock_link_minutes` (default 1440 minutes).
+- The lock route is protected by Laravel's `signed` middleware — the request must be a valid signed URL.
+
+Example route (the package registers this for you if you include package routes):
+```php
+Route::middleware(['signed'])->get('/lockout/lock', \Beliven\Lockout\Http\Controllers\LockController::class)->name('lockout.lock');
+```
+
+Translation & notification text
+- The `AccountLogged` notification uses translation keys under `lockout.notifications.account_logged.*`. You can change the notification class or customize translations to alter the subject / body of the email sent at login.
+
+Security considerations
+- Because the lock link grants the ability to immediately lock an account, the link is temporary and signed; ensure `APP_KEY` and your app URL are configured correctly so signature validation works reliably.
+- The link includes a random entropy parameter to reduce predictability.
+
+Customizing behavior
+- Replace the login notification by setting `lockout.login_notification_class` in your config.
+- If you want a custom flow when the link is clicked, you can override the `LockController` or register your own route/listener for `lockout.lock` and `lockout.unlock` events.
+
+This feature is opt-in; leave `lock_on_login` disabled if you prefer not to send login notifications.
 
 ---
 
